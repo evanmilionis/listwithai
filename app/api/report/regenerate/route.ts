@@ -45,14 +45,12 @@ export async function POST(request: NextRequest) {
       .update({ rentcast_data: null })
       .eq('id', reportId);
 
-    // Fire-and-forget regeneration
-    generateReport(reportId).catch((err) => {
-      console.error(`Report regeneration failed for ${reportId}:`, err);
-    });
+    // Await regeneration — Vercel kills the function after response is sent
+    await generateReport(reportId);
 
     return NextResponse.json({
       success: true,
-      message: 'Report regeneration started',
+      message: 'Report regeneration complete',
     });
   } catch (error) {
     console.error('Report regenerate endpoint error:', error);

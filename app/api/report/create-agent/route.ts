@@ -81,10 +81,8 @@ export async function POST(request: NextRequest) {
 
     console.log(`Agent report created: ${report.id} for user ${userId}`);
 
-    // Fire-and-forget report generation
-    generateReport(report.id).catch((err) => {
-      console.error(`Agent report generation failed for ${report.id}:`, err);
-    });
+    // Await generation — Vercel kills serverless functions after response
+    await generateReport(report.id);
 
     return NextResponse.json({
       success: true,

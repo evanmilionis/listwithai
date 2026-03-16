@@ -14,19 +14,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Fire-and-forget: start generation but don't await it
-    generateReport(reportId).catch((err) => {
-      console.error(`Report generation failed for ${reportId}:`, err);
-    });
+    // Await generation — Vercel kills the function if we don't
+    await generateReport(reportId);
 
     return NextResponse.json({
       success: true,
-      message: 'Report generation started',
+      message: 'Report generation complete',
     });
   } catch (error) {
     console.error('Report generate endpoint error:', error);
     return NextResponse.json(
-      { error: 'Failed to trigger report generation' },
+      { error: 'Failed to generate report' },
       { status: 500 }
     );
   }

@@ -97,10 +97,8 @@ export async function POST(request: NextRequest) {
             console.error('Failed to update report status:', updateError);
           }
 
-          // Fire-and-forget: return 200 to Stripe immediately, generate in background
-          generateReport(reportId).catch((err) => {
-            console.error('Report generation failed for', reportId, err);
-          });
+          // Await generation — Vercel kills the function after response is sent
+          await generateReport(reportId);
         }
 
         if (session.mode === 'subscription') {
