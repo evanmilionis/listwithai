@@ -14,6 +14,10 @@ export default function ReportPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [gateUnlocked, setGateUnlocked] = useState(false);
+  const [gateEmail, setGateEmail] = useState('');
+  const [gateName, setGateName] = useState('');
+  const [gateLoading, setGateLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -33,6 +37,15 @@ export default function ReportPage() {
         }
         const data = await res.json();
         setReport(data);
+
+        // Check if this viewer already unlocked this report
+        const unlocked = sessionStorage.getItem(`report-unlocked-${id}`);
+        // If it's a homeowner report (they paid for it), auto-unlock
+        if (data.customer_type === 'homeowner') {
+          setGateUnlocked(true);
+        } else if (unlocked) {
+          setGateUnlocked(true);
+        }
       } catch {
         setError('fetch_error');
       } finally {
@@ -42,6 +55,30 @@ export default function ReportPage() {
 
     fetchReport();
   }, [id]);
+
+  const handleGateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!gateEmail) return;
+
+    setGateLoading(true);
+    try {
+      await fetch('/api/leads/gate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: gateEmail,
+          name: gateName,
+          reportId: id,
+        }),
+      });
+    } catch {
+      // Don't block access if lead capture fails
+    }
+
+    sessionStorage.setItem(`report-unlocked-${id}`, 'true');
+    setGateUnlocked(true);
+    setGateLoading(false);
+  };
 
   return (
     <>
@@ -92,8 +129,69 @@ export default function ReportPage() {
             </div>
           )}
 
+          {/* Lead capture gate for shared agent reports */}
+          {!loading && !error && report && !gateUnlocked && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 p-8 shadow-sm">
+                <div className="text-center mb-6">
+                  <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center mx-auto mb-4">
+                    <span className="text-xl font-bold text-blue-600">L</span>
+                  </div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    View Your Property Report
+                  </h2>
+                  <p className="text-sm text-slate-500 mt-2">
+                    Enter your email to access the full AI-powered selling report
+                    for <strong>{report.property_address}</strong>.
+                  </p>
+                </div>
+
+                <form onSubmit={handleGateSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="gate-name" className="block text-sm font-medium text-slate-700 mb-1">
+                      Your Name
+                    </label>
+                    <input
+                      id="gate-name"
+                      type="text"
+                      value={gateName}
+                      onChange={(e) => setGateName(e.target.value)}
+                      placeholder="John Smith"
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="gate-email" className="block text-sm font-medium text-slate-700 mb-1">
+                      Email Address <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="gate-email"
+                      type="email"
+                      required
+                      value={gateEmail}
+                      onChange={(e) => setGateEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="block w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={gateLoading || !gateEmail}
+                    className="w-full py-2.5 px-4 bg-navy-800 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
+                  >
+                    {gateLoading ? 'Loading...' : 'View Report'}
+                  </button>
+                  <p className="text-xs text-slate-400 text-center">
+                    We&apos;ll never spam you. View our{' '}
+                    <a href="/privacy" className="underline">Privacy Policy</a>.
+                  </p>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* Report content */}
-          {!loading && !error && report && <ReportViewer report={report} />}
+          {!loading && !error && report && gateUnlocked && <ReportViewer report={report} />}
         </div>
       </main>
       <Footer />

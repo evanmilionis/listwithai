@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   X,
+  CreditCard,
 } from 'lucide-react';
 
 const NAV_LINKS = [
@@ -29,6 +30,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -89,6 +91,7 @@ export default function DashboardLayout({
       }
 
       setEmail(session.user.email ?? '');
+      setUserId(session.user.id);
       setLoading(false);
     };
 
@@ -99,6 +102,22 @@ export default function DashboardLayout({
     const supabase = createClient();
     await supabase.auth.signOut();
     router.replace('/');
+  };
+
+  const handleManageBilling = async () => {
+    try {
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (err) {
+      console.error('Failed to open billing portal:', err);
+    }
   };
 
   if (loading) {
@@ -148,8 +167,15 @@ export default function DashboardLayout({
       </nav>
 
       {/* User section */}
-      <div className="px-4 py-4 border-t border-slate-200">
+      <div className="px-4 py-4 border-t border-slate-200 space-y-1">
         <p className="text-xs text-slate-500 truncate mb-3">{email}</p>
+        <button
+          onClick={handleManageBilling}
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+        >
+          <CreditCard className="w-4 h-4" />
+          Manage Subscription
+        </button>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
