@@ -1,0 +1,124 @@
+{
+  "_note": "Regional attorney directories are being curated. All regions currently route to the Florida Bar Lawyer Referral Service — a verified, official resource. Regional vetted attorneys will be added post-launch.",
+
+  "southwest_florida": {
+    "cities": [
+      "Fort Myers",
+      "Estero",
+      "Naples",
+      "Bonita Springs",
+      "Cape Coral",
+      "Marco Island",
+      "Lehigh Acres"
+    ],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review $400–$800",
+        "note": "The official Florida Bar referral service. When calling, ask specifically for a real estate attorney experienced with FSBO residential closings in Lee or Collier County."
+      }
+    ]
+  },
+
+  "tampa_bay": {
+    "cities": [
+      "Tampa",
+      "St. Petersburg",
+      "Clearwater",
+      "Brandon",
+      "Wesley Chapel",
+      "Sarasota",
+      "Bradenton"
+    ],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review $450–$900",
+        "note": "The official Florida Bar referral service. When calling, ask specifically for a real estate attorney experienced with FSBO residential closings in Hillsborough, Pinellas, Sarasota, or Manatee County."
+      }
+    ]
+  },
+
+  "orlando": {
+    "cities": [
+      "Orlando",
+      "Kissimmee",
+      "Sanford",
+      "Lake Mary",
+      "Winter Park",
+      "Ocala"
+    ],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review $400–$850",
+        "note": "The official Florida Bar referral service. When calling, ask specifically for a real estate attorney experienced with FSBO residential closings in Orange, Osceola, Seminole, or Marion County."
+      }
+    ]
+  },
+
+  "miami_broward": {
+    "cities": [
+      "Miami",
+      "Fort Lauderdale",
+      "Boca Raton",
+      "Hollywood",
+      "Pompano Beach",
+      "Cooper City",
+      "Coral Springs"
+    ],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review $500–$1,000",
+        "note": "The official Florida Bar referral service. When calling, ask specifically for a real estate attorney experienced with FSBO residential closings in Miami-Dade, Broward, or Palm Beach County. Bilingual (English/Spanish) attorneys are available."
+      }
+    ]
+  },
+
+  "jacksonville_north": {
+    "cities": [
+      "Jacksonville",
+      "St. Augustine",
+      "Gainesville",
+      "Daytona Beach",
+      "Tallahassee"
+    ],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review $350–$750",
+        "note": "The official Florida Bar referral service. When calling, ask specifically for a real estate attorney experienced with FSBO residential closings in Duval, St. Johns, Alachua, Volusia, or Leon County."
+      }
+    ]
+  },
+
+  "other_florida": {
+    "cities": ["All other Florida cities"],
+    "attorneys": [
+      {
+        "name": "Florida Bar Lawyer Referral Service",
+        "specialty": "Attorney Referral — Real Estate",
+        "phone": "800-342-8011",
+        "website": "https://www.floridabar.org/public/lfrs/",
+        "avg_review_cost": "Initial consultation typically $25–$50; full contract review varies by county",
+        "note": "The official Florida Bar referral service. Request a real estate attorney experienced with FSBO residential closings in your specific county."
+      }
+    ]
+  }
+}
