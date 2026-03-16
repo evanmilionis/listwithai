@@ -1140,7 +1140,7 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
           </p>
         </div>
         <a
-          href={`mailto:support@listwithai.io?subject=Report Issue — ${report.property_address}&body=Report ID: ${report.id}%0A%0APlease describe the issue:%0A`}
+          href={`mailto:evanmilionis@gmail.com?subject=Report Issue — ${report.property_address}&body=Report ID: ${report.id}%0A%0APlease describe the issue:%0A`}
           className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 whitespace-nowrap"
         >
           Contact Support
