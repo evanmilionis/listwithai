@@ -6,28 +6,19 @@ import { createServiceClient } from '@/lib/supabase';
 import { generateReport } from '@/lib/reportGenerator';
 import Stripe from 'stripe';
 
-// Initialize Stripe directly to avoid any import issues
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
 });
 
 export async function POST(request: NextRequest) {
-  console.log('Webhook received');
-  console.log('STRIPE_WEBHOOK_SECRET exists:', !!process.env.STRIPE_WEBHOOK_SECRET);
-  console.log('STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
-
   let body: string;
   try {
     body = await request.text();
-    console.log('Body length:', body.length);
-  } catch (err) {
-    console.error('Failed to read body:', err);
+  } catch {
     return NextResponse.json({ error: 'Failed to read body' }, { status: 400 });
   }
 
   const sig = request.headers.get('stripe-signature');
-  console.log('Signature exists:', !!sig);
-
   if (!sig) {
     return NextResponse.json(
       { error: 'Missing stripe-signature header' },
@@ -43,11 +34,10 @@ export async function POST(request: NextRequest) {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
-    console.log('Event verified:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return NextResponse.json(
-      { error: 'Webhook signature verification failed', details: String(err) },
+      { error: 'Webhook signature verification failed' },
       { status: 400 }
     );
   }
@@ -58,9 +48,6 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        console.log('Checkout session completed:', session.id);
-        console.log('Report ID from metadata:', session.metadata?.report_id);
-        console.log('Session mode:', session.mode);
 
         if (session.metadata?.report_id) {
           const reportId = session.metadata.report_id;
@@ -74,18 +61,13 @@ export async function POST(request: NextRequest) {
             .eq('id', reportId);
 
           if (updateError) {
-            console.error('Failed to update report:', updateError);
-          } else {
-            console.log('Report status set to processing');
+            console.error('Failed to update report status:', updateError);
           }
 
-          // Await report generation
           try {
-            console.log('Starting report generation...');
             await generateReport(reportId);
-            console.log('Report generation completed');
           } catch (err) {
-            console.error('Report generation failed:', err);
+            console.error('Report generation failed for', reportId, err);
           }
         }
 
@@ -138,12 +120,8 @@ export async function POST(request: NextRequest) {
 
         break;
       }
-
-      default:
-        console.log(`Unhandled event type: ${event.type}`);
     }
 
-    console.log('Webhook handler complete, returning 200');
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
     console.error('Webhook handler error:', error);

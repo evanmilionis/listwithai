@@ -51,13 +51,24 @@ export default function Footer() {
                 </a>
               </li>
               <li>
-                <span className="cursor-default">Privacy Policy</span>
+                <Link href="/privacy" className="hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
               </li>
               <li>
-                <span className="cursor-default">Terms of Service</span>
+                <Link href="/terms" className="hover:text-white transition-colors">
+                  Terms of Service
+                </Link>
               </li>
               <li>
-                <span className="cursor-default">Disclaimer</span>
+                <Link href="/disclaimer" className="hover:text-white transition-colors">
+                  Disclaimer
+                </Link>
+              </li>
+              <li>
+                <Link href="/refund-policy" className="hover:text-white transition-colors">
+                  Refund Policy
+                </Link>
               </li>
             </ul>
           </div>
