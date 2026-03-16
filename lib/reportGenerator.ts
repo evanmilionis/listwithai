@@ -198,5 +198,16 @@ export async function generateReport(reportId: string): Promise<void> {
       .from('reports')
       .update({ status: 'failed' })
       .eq('id', reportId);
+
+    // Alert admin immediately on failure
+    try {
+      await fetch('https://listwithai.io/api/notify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportId, error: String(error) }),
+      });
+    } catch (notifyErr) {
+      console.error('Failed to notify admin:', notifyErr);
+    }
   }
 }
