@@ -107,28 +107,36 @@ export async function generateReport(reportId: string): Promise<void> {
     console.log(`Property context built — ${ctx.text.length} chars (~${Math.round(ctx.text.length / 4)} tokens)`);
 
     // -----------------------------------------------------------------------
-    // 4. Run Claude modules SEQUENTIALLY
-    //    ctx is passed into every call — calls 2-5 get cache hits on both
-    //    the system prompt and the property context block (~80% input cost reduction)
+    // 4. Run Claude modules IN PARALLEL
+    //    All 5 modules run concurrently to fit within Vercel's 60s timeout
     // -----------------------------------------------------------------------
-    console.log('Starting Claude module 1/5: Timeline...');
-    const timeline = await generateTimeline(typedReport, rentcastData, ctx);
+    console.log('Starting all 5 Claude modules in parallel...');
+    const [timeline, improvements, pricing, listing, legal] = await Promise.all([
+      generateTimeline(typedReport, rentcastData, ctx).catch((err) => {
+        console.error('Timeline failed:', err);
+        return null;
+      }),
+      generateImprovements(typedReport, rentcastData, ctx).catch((err) => {
+        console.error('Improvements failed:', err);
+        return null;
+      }),
+      generatePricingAnalysis(typedReport, rentcastData, ctx).catch((err) => {
+        console.error('Pricing failed:', err);
+        return null;
+      }),
+      generateListingCopy(typedReport, rentcastData, amenities, ctx).catch((err) => {
+        console.error('Listing failed:', err);
+        return null;
+      }),
+      generateLegalPackage(typedReport, ctx).catch((err) => {
+        console.error('Legal failed:', err);
+        return null;
+      }),
+    ]);
     console.log('  Timeline:', timeline ? 'OK' : 'FAILED');
-
-    console.log('Starting Claude module 2/5: Improvements...');
-    const improvements = await generateImprovements(typedReport, rentcastData, ctx);
     console.log('  Improvements:', improvements ? 'OK' : 'FAILED');
-
-    console.log('Starting Claude module 3/5: Pricing...');
-    const pricing = await generatePricingAnalysis(typedReport, rentcastData, ctx);
     console.log('  Pricing:', pricing ? 'OK' : 'FAILED');
-
-    console.log('Starting Claude module 4/5: Listing Copy...');
-    const listing = await generateListingCopy(typedReport, rentcastData, amenities, ctx);
     console.log('  Listing:', listing ? 'OK' : 'FAILED');
-
-    console.log('Starting Claude module 5/5: Legal Package...');
-    const legal = await generateLegalPackage(typedReport, ctx);
     console.log('  Legal:', legal ? 'OK' : 'FAILED');
 
     // -----------------------------------------------------------------------
