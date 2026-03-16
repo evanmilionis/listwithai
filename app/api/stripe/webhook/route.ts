@@ -44,6 +44,27 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
 
+  // -----------------------------------------------------------------------
+  // Idempotency: Check if we've already processed this Stripe event.
+  // Stripe retries events when it doesn't get a 200 quickly enough,
+  // which was causing duplicate report generations and emails.
+  // -----------------------------------------------------------------------
+  const { data: existing } = await supabase
+    .from('processed_events')
+    .select('id')
+    .eq('stripe_event_id', event.id)
+    .single();
+
+  if (existing) {
+    console.log(`Event ${event.id} already processed, skipping.`);
+    return NextResponse.json({ received: true, duplicate: true }, { status: 200 });
+  }
+
+  // Mark this event as processed BEFORE doing any work
+  await supabase
+    .from('processed_events')
+    .insert({ stripe_event_id: event.id });
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -51,6 +72,18 @@ export async function POST(request: NextRequest) {
 
         if (session.metadata?.report_id) {
           const reportId = session.metadata.report_id;
+
+          // Check if this report is already processing or complete
+          const { data: report } = await supabase
+            .from('reports')
+            .select('status')
+            .eq('id', reportId)
+            .single();
+
+          if (report?.status === 'processing' || report?.status === 'complete') {
+            console.log(`Report ${reportId} already ${report.status}, skipping generation.`);
+            break;
+          }
 
           const { error: updateError } = await supabase
             .from('reports')
@@ -64,27 +97,35 @@ export async function POST(request: NextRequest) {
             console.error('Failed to update report status:', updateError);
           }
 
-          try {
-            await generateReport(reportId);
-          } catch (err) {
+          // Fire-and-forget: return 200 to Stripe immediately, generate in background
+          generateReport(reportId).catch((err) => {
             console.error('Report generation failed for', reportId, err);
-          }
+          });
         }
 
         if (session.mode === 'subscription') {
-          const { error: subError } = await supabase
+          // Check if subscription already exists (idempotency)
+          const { data: existingSub } = await supabase
             .from('agent_subscriptions')
-            .insert({
-              stripe_customer_id: session.customer as string,
-              stripe_subscription_id: session.subscription as string,
-              email: session.customer_details?.email ?? '',
-              name: session.customer_details?.name ?? '',
-              status: 'active',
-              reports_run: 0,
-            });
+            .select('id')
+            .eq('stripe_subscription_id', session.subscription as string)
+            .single();
 
-          if (subError) {
-            console.error('Failed to create agent subscription:', subError);
+          if (!existingSub) {
+            const { error: subError } = await supabase
+              .from('agent_subscriptions')
+              .insert({
+                stripe_customer_id: session.customer as string,
+                stripe_subscription_id: session.subscription as string,
+                email: session.customer_details?.email ?? '',
+                name: session.customer_details?.name ?? '',
+                status: 'active',
+                reports_run: 0,
+              });
+
+            if (subError) {
+              console.error('Failed to create agent subscription:', subError);
+            }
           }
         }
 
