@@ -8,6 +8,10 @@ import {
   generatePricingAnalysis,
   generateListingCopy,
   generateLegalPackage,
+  generateSocialMedia,
+  generateBuyerCMA,
+  generateOpenHouse,
+  generateMarketSnapshot,
 } from '@/lib/claude';
 import { sendReportReadyEmail } from '@/lib/resend';
 import type { Report, ReportOutput, RentcastData, NearbyAmenities } from '@/types';
@@ -140,6 +144,41 @@ export async function generateReport(reportId: string): Promise<void> {
     console.log('  Legal:', legal ? 'OK' : 'FAILED');
 
     // -----------------------------------------------------------------------
+    // 4b. Run AGENT-ONLY modules (social media, buyer CMA, open house, market snapshot)
+    //     Only generated for agent customer_type reports
+    // -----------------------------------------------------------------------
+    let socialMedia = null;
+    let buyerCMA = null;
+    let openHouse = null;
+    let marketSnapshot = null;
+
+    if (typedReport.customer_type === 'agent') {
+      console.log('Starting agent-only modules...');
+      [socialMedia, buyerCMA, openHouse, marketSnapshot] = await Promise.all([
+        generateSocialMedia(typedReport, rentcastData, amenities, ctx).catch((err) => {
+          console.error('Social Media failed:', err);
+          return null;
+        }),
+        generateBuyerCMA(typedReport, rentcastData, ctx).catch((err) => {
+          console.error('Buyer CMA failed:', err);
+          return null;
+        }),
+        generateOpenHouse(typedReport, rentcastData, amenities, ctx).catch((err) => {
+          console.error('Open House failed:', err);
+          return null;
+        }),
+        generateMarketSnapshot(typedReport, rentcastData, ctx).catch((err) => {
+          console.error('Market Snapshot failed:', err);
+          return null;
+        }),
+      ]);
+      console.log('  Social Media:', socialMedia ? 'OK' : 'FAILED');
+      console.log('  Buyer CMA:', buyerCMA ? 'OK' : 'FAILED');
+      console.log('  Open House:', openHouse ? 'OK' : 'FAILED');
+      console.log('  Market Snapshot:', marketSnapshot ? 'OK' : 'FAILED');
+    }
+
+    // -----------------------------------------------------------------------
     // 5. Store results & mark complete
     // -----------------------------------------------------------------------
     const reportOutput: ReportOutput = {
@@ -149,10 +188,19 @@ export async function generateReport(reportId: string): Promise<void> {
       listing,
       legal,
       amenities,
+      social_media: socialMedia,
+      buyer_cma: buyerCMA,
+      open_house: openHouse,
+      market_snapshot: marketSnapshot,
     };
 
-    const successCount = [timeline, improvements, pricing, listing, legal].filter(Boolean).length;
-    console.log(`Report modules complete: ${successCount}/5 succeeded`);
+    const baseModules = [timeline, improvements, pricing, listing, legal].filter(Boolean).length;
+    const agentModules = typedReport.customer_type === 'agent'
+      ? [socialMedia, buyerCMA, openHouse, marketSnapshot].filter(Boolean).length
+      : 0;
+    const totalModules = typedReport.customer_type === 'agent' ? 9 : 5;
+    const successCount = baseModules + agentModules;
+    console.log(`Report modules complete: ${successCount}/${totalModules} succeeded`);
     console.log('Data sizes:', {
       timeline:     timeline     ? JSON.stringify(timeline).length     : 0,
       improvements: improvements ? JSON.stringify(improvements).length : 0,
@@ -198,7 +246,7 @@ export async function generateReport(reportId: string): Promise<void> {
       console.log('Skipping email (regeneration)');
     }
 
-    console.log(`Report ${reportId} generated successfully (${successCount}/5 modules)`);
+    console.log(`Report ${reportId} generated successfully (${successCount}/${totalModules} modules)`);
   } catch (error) {
     console.error(`Report ${reportId} generation failed:`, error);
 

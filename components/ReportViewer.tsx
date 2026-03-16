@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, getConditionLabel } from '@/lib/utils';
-import type { Report } from '@/types';
+import type { Report, SocialMediaModule, BuyerCMAModule, OpenHouseModule, MarketSnapshotModule } from '@/types';
 import Disclaimer from '@/components/Disclaimer';
 import MLSReferral from '@/components/MLSReferral';
 import AttorneyCards from '@/components/AttorneyCards';
@@ -26,6 +26,9 @@ import {
   CheckCircle,
   TrendingUp,
   Wrench,
+  BarChart3,
+  Building,
+  Megaphone,
 } from 'lucide-react';
 
 interface ReportViewerProps {
@@ -44,7 +47,14 @@ const TABS = [
   { key: 'attorneys', label: 'Attorneys', icon: Users },
 ] as const;
 
-type TabKey = (typeof TABS)[number]['key'];
+const AGENT_TABS = [
+  { key: 'social', label: 'Social Media', icon: Megaphone },
+  { key: 'buyercma', label: 'Buyer CMA', icon: BarChart3 },
+  { key: 'openhouse', label: 'Open House', icon: Building },
+  { key: 'market', label: 'Market', icon: TrendingUp },
+] as const;
+
+type TabKey = (typeof TABS)[number]['key'] | (typeof AGENT_TABS)[number]['key'];
 
 function StatusBadge({ status }: { status: Report['status'] }) {
   const styles: Record<Report['status'], string> = {
@@ -850,6 +860,12 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
     );
   }
 
+  const output = report.report_output;
+  const socialMedia = output?.social_media as SocialMediaModule | null | undefined;
+  const buyerCMA = output?.buyer_cma as BuyerCMAModule | null | undefined;
+  const openHouse = output?.open_house as OpenHouseModule | null | undefined;
+  const marketSnapshot = output?.market_snapshot as MarketSnapshotModule | null | undefined;
+
   const handleShare = async () => {
     try {
       const url = window.location.href;
@@ -1114,6 +1130,21 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
               </button>
             );
           })}
+          {agentMode && AGENT_TABS.map(({ key, label, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={cn(
+                'flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors',
+                activeTab === key
+                  ? 'border-navy-800 text-navy-800'
+                  : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
         </nav>
       </div>
 
@@ -1127,6 +1158,326 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
         {activeTab === 'legal' && <LegalPackage report={report} />}
         {activeTab === 'mls' && <MLSAccess />}
         {activeTab === 'attorneys' && <AttorneysTab city={report.property_city} />}
+
+        {activeTab === 'social' && socialMedia && (
+          <div className="space-y-6">
+            {/* Instagram */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Instagram Caption</p>
+                <CopyButton text={socialMedia.instagram_caption + '\n\n' + socialMedia.instagram_hashtags.join(' ')} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.instagram_caption}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {socialMedia.instagram_hashtags.map((tag, i) => (
+                  <span key={i} className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">#{tag.replace('#', '')}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Facebook */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Facebook Post</p>
+                <CopyButton text={socialMedia.facebook_post} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.facebook_post}</p>
+            </div>
+
+            {/* Twitter/X */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">X (Twitter) Post</p>
+                <CopyButton text={socialMedia.twitter_post} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed">{socialMedia.twitter_post}</p>
+              <p className="text-xs text-slate-400 mt-1">{socialMedia.twitter_post.length}/280 characters</p>
+            </div>
+
+            {/* LinkedIn */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">LinkedIn Post</p>
+                <CopyButton text={socialMedia.linkedin_post} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.linkedin_post}</p>
+            </div>
+
+            {/* Video Script */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Reels / TikTok Script</p>
+                <CopyButton text={socialMedia.short_form_video_script} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.short_form_video_script}</p>
+            </div>
+
+            {/* Email Blast */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Email Blast</p>
+                <CopyButton text={socialMedia.email_blast} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.email_blast}</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'buyercma' && buyerCMA && (
+          <div className="space-y-6">
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide mb-2">Executive Summary</p>
+              <p className="text-sm text-emerald-900 leading-relaxed">{buyerCMA.executive_summary}</p>
+            </div>
+
+            {/* Property Highlights */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Property Highlights</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {buyerCMA.property_highlights.map((h, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                    <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Comparable Sales */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Comparable Sales Analysis</p>
+                <CopyButton text={buyerCMA.comparable_sales.map(c => `${c.address} - $${c.sale_price.toLocaleString()} (${c.condition_comparison})`).join('\n')} label="Copy" />
+              </div>
+              <div className="space-y-4">
+                {buyerCMA.comparable_sales.map((comp, i) => (
+                  <div key={i} className="border border-slate-100 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-medium text-slate-900">{comp.address}</p>
+                      <p className="text-sm font-bold text-slate-900">${comp.sale_price.toLocaleString()}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-xs text-slate-500 mb-2">
+                      <span>{comp.beds}bd / {comp.baths}ba</span>
+                      <span>{comp.sqft.toLocaleString()} sqft</span>
+                      <span>${comp.ppsf}/sqft</span>
+                      <span>Sold {comp.sale_date}</span>
+                    </div>
+                    <p className="text-xs text-slate-600"><strong>Comparison:</strong> {comp.condition_comparison}</p>
+                    <p className="text-xs text-slate-600"><strong>Adjustment:</strong> {comp.price_adjustment}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Value Justification */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Market Position</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{buyerCMA.market_position}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Price Per Sqft Analysis</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{buyerCMA.price_per_sqft_analysis}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Value Justification</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{buyerCMA.value_justification}</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Investment Outlook</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{buyerCMA.investment_outlook}</p>
+            </div>
+
+            {/* Neighborhood */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Neighborhood Highlights</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {buyerCMA.neighborhood_highlights.map((h, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                    <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <span>{h}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'openhouse' && openHouse && (
+          <div className="space-y-6">
+            {/* Fact Sheet */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Property Fact Sheet</p>
+                <CopyButton text={openHouse.property_fact_sheet} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{openHouse.property_fact_sheet}</p>
+            </div>
+
+            {/* Feature Highlights */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Feature Highlights</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {openHouse.feature_highlights.map((f, i) => (
+                  <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                    <Star className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <span>{f}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Neighborhood Info */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Neighborhood Info</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{openHouse.neighborhood_info}</p>
+            </div>
+
+            {/* Talking Points */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Agent Talking Points</p>
+                <CopyButton text={openHouse.agent_talking_points.join('\n• ')} label="Copy" />
+              </div>
+              <ul className="space-y-2">
+                {openHouse.agent_talking_points.map((point, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                    <ChevronRight className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Objection Handlers */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Objection Handlers</p>
+              <div className="space-y-4">
+                {openHouse.objection_handlers.map((obj, i) => (
+                  <div key={i} className="border-l-2 border-amber-300 pl-4">
+                    <p className="text-sm font-medium text-slate-900">&ldquo;{obj.objection}&rdquo;</p>
+                    <p className="text-sm text-slate-600 mt-1">{obj.response}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Follow-up Email */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Post Open House Follow-up Email</p>
+                <CopyButton text={openHouse.follow_up_email_template} label="Copy" />
+              </div>
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{openHouse.follow_up_email_template}</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'market' && marketSnapshot && (
+          <div className="space-y-6">
+            {/* Summary */}
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
+              <p className="text-sm text-emerald-900 leading-relaxed">{marketSnapshot.market_summary}</p>
+            </div>
+
+            {/* Key Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Median Price</p>
+                <p className="text-xl font-bold text-slate-900 mt-1">${marketSnapshot.median_price.toLocaleString()}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Avg $/Sqft</p>
+                <p className="text-xl font-bold text-slate-900 mt-1">${marketSnapshot.avg_price_per_sqft}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Avg DOM</p>
+                <p className="text-xl font-bold text-slate-900 mt-1">{marketSnapshot.avg_days_on_market}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm text-center">
+                <p className="text-xs text-slate-500 uppercase tracking-wide">Market Trend</p>
+                <p className={`text-xl font-bold mt-1 ${
+                  marketSnapshot.market_trend === 'Rising' ? 'text-emerald-600' :
+                  marketSnapshot.market_trend === 'Declining' ? 'text-red-600' :
+                  'text-amber-600'
+                }`}>{marketSnapshot.market_trend}</p>
+              </div>
+            </div>
+
+            {/* Market Analysis */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Inventory Level</p>
+                <p className="text-sm text-slate-700">{marketSnapshot.inventory_level}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Buyer vs Seller Market</p>
+                <p className="text-sm text-slate-700">{marketSnapshot.buyer_vs_seller_market}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Price Trend</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{marketSnapshot.price_trend_narrative}</p>
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Best Time to List</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{marketSnapshot.best_time_to_list}</p>
+            </div>
+
+            {/* Key Insights */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Key Market Insights</p>
+              <ul className="space-y-2">
+                {marketSnapshot.key_insights.map((insight, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                    <TrendingUp className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                    <span>{insight}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Recent Sales */}
+            {marketSnapshot.comparable_recent_sales && marketSnapshot.comparable_recent_sales.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Recent Sales in Area</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                        <th className="px-5 py-3 font-medium">Address</th>
+                        <th className="px-5 py-3 font-medium">Price</th>
+                        <th className="px-5 py-3 font-medium">Sqft</th>
+                        <th className="px-5 py-3 font-medium">Bed/Bath</th>
+                        <th className="px-5 py-3 font-medium">Sold</th>
+                        <th className="px-5 py-3 font-medium">DOM</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {marketSnapshot.comparable_recent_sales.map((sale, i) => (
+                        <tr key={i} className="hover:bg-slate-50">
+                          <td className="px-5 py-3 text-slate-900 font-medium">{sale.address}</td>
+                          <td className="px-5 py-3 text-slate-900">${sale.price.toLocaleString()}</td>
+                          <td className="px-5 py-3 text-slate-600">{sale.sqft.toLocaleString()}</td>
+                          <td className="px-5 py-3 text-slate-600">{sale.beds}/{sale.baths}</td>
+                          <td className="px-5 py-3 text-slate-600">{sale.sold_date}</td>
+                          <td className="px-5 py-3 text-slate-600">{sale.dom}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Support banner */}

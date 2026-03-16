@@ -13,11 +13,13 @@ import {
   Menu,
   X,
   CreditCard,
+  Settings,
 } from 'lucide-react';
 
 const NAV_LINKS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/new', label: 'New Report', icon: FilePlus },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/', label: 'Back to Home', icon: Home },
 ];
 

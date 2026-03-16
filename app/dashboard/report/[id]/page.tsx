@@ -13,6 +13,8 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  Mail,
+  ChevronDown,
 } from 'lucide-react';
 
 export default function AgentReportPage() {
@@ -25,6 +27,9 @@ export default function AgentReportPage() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
+  const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [sendingFollowUp, setSendingFollowUp] = useState(false);
+  const [followUpSent, setFollowUpSent] = useState<string | null>(null);
 
   const loadReport = async () => {
     const supabase = createClient();
@@ -125,6 +130,39 @@ export default function AgentReportPage() {
     }
   };
 
+  const handleFollowUp = async (template: string) => {
+    setSendingFollowUp(true);
+    setFollowUpSent(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch('/api/agent/followup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId,
+          userId: session.user.id,
+          template,
+        }),
+      });
+
+      if (res.ok) {
+        setFollowUpSent(template);
+        setFollowUpOpen(false);
+        setTimeout(() => setFollowUpSent(null), 3000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to send email');
+      }
+    } catch {
+      alert('Failed to send email');
+    } finally {
+      setSendingFollowUp(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -171,6 +209,46 @@ export default function AgentReportPage() {
             <RefreshCw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
             {regenerating ? 'Regenerating...' : 'Regenerate Report'}
           </button>
+
+          {/* Follow-up email dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setFollowUpOpen(!followUpOpen)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              {followUpSent ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  Email Sent!
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4" />
+                  Email Client
+                  <ChevronDown className="w-3 h-3" />
+                </>
+              )}
+            </button>
+            {followUpOpen && (
+              <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg z-10">
+                {[
+                  { key: 'report_ready', label: 'Report is Ready' },
+                  { key: 'pricing_review', label: 'Pricing Discussion' },
+                  { key: 'ready_to_list', label: 'Ready to List?' },
+                  { key: 'check_in', label: 'General Check-in' },
+                ].map((t) => (
+                  <button
+                    key={t.key}
+                    onClick={() => handleFollowUp(t.key)}
+                    disabled={sendingFollowUp}
+                    className="block w-full text-left px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 first:rounded-t-lg last:rounded-b-lg disabled:opacity-50"
+                  >
+                    {sendingFollowUp ? 'Sending...' : t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleShare}

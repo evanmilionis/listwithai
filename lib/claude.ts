@@ -8,6 +8,10 @@ import type {
   PricingModule,
   ListingModule,
   LegalModule,
+  SocialMediaModule,
+  BuyerCMAModule,
+  OpenHouseModule,
+  MarketSnapshotModule,
 } from '@/types';
 import { getConditionLabel, formatCurrency } from '@/lib/utils';
 import { buildLegalDocuments, type TemplateVars } from '@/lib/legalTemplates';
@@ -34,11 +38,15 @@ const MODEL = 'claude-sonnet-4-6';
 // Per-module token ceilings — sized to what each module actually needs.
 // Cuts wasteful reserved-but-unused tokens billed on every call.
 const MODULE_MAX_TOKENS = {
-  timeline:     8192,
-  improvements: 6000,
-  pricing:      6000,
-  listingCopy:  4096,
-  legal:        8192,
+  timeline:       8192,
+  improvements:   6000,
+  pricing:        6000,
+  listingCopy:    4096,
+  legal:          8192,
+  socialMedia:    4096,
+  buyerCMA:       6000,
+  openHouse:      4096,
+  marketSnapshot: 4096,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -474,4 +482,149 @@ Return JSON with this exact structure:
       when_to_call: 'Before accepting any offer',
     },
   } as unknown as LegalModule;
+}
+
+// ---------------------------------------------------------------------------
+// Module 6 — Social Media
+// ---------------------------------------------------------------------------
+
+export async function generateSocialMedia(
+  report: Report,
+  rentcastData: RentcastData,
+  amenities: NearbyAmenities | null,
+  ctx: PropertyContext
+): Promise<SocialMediaModule | null> {
+  const system =
+    'You are a top-performing real estate social media marketer. Write engaging, scroll-stopping social media content that drives inquiries. Know Florida buyer demographics. Never use generic cliches.';
+
+  const prompt = `Using the property context above, create social media marketing content for this listing.
+
+Return JSON with this exact structure:
+{
+  "instagram_caption": "string (engaging, emoji-friendly, 150-200 words with line breaks)",
+  "instagram_hashtags": ["string (15-20 relevant hashtags)"],
+  "facebook_post": "string (conversational, 100-150 words, designed for engagement)",
+  "twitter_post": "string (under 280 characters, punchy)",
+  "linkedin_post": "string (professional tone, 100-150 words, targets investors/relocators)",
+  "short_form_video_script": "string (30-60 second script for Reels/TikTok with shot directions)",
+  "email_blast": "string (HTML-friendly email body, 150-200 words, with clear CTA)"
+}`;
+
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.socialMedia)) as SocialMediaModule | null;
+}
+
+// ---------------------------------------------------------------------------
+// Module 7 — Buyer CMA
+// ---------------------------------------------------------------------------
+
+export async function generateBuyerCMA(
+  report: Report,
+  rentcastData: RentcastData,
+  ctx: PropertyContext
+): Promise<BuyerCMAModule | null> {
+  const system =
+    'You are a Florida real estate agent creating a buyer-facing CMA presentation. Your goal is to justify the listing price with data and position the property as a strong value. Be professional, data-driven, and persuasive without being pushy.';
+
+  const prompt = `Using the property context above, create a buyer-facing Comparative Market Analysis presentation that an agent can share with potential buyers to justify the listing price.
+
+Return JSON with this exact structure:
+{
+  "executive_summary": "string (2-3 sentences positioning the property and price)",
+  "property_highlights": ["string (8-10 key selling points)"],
+  "comparable_sales": [
+    {
+      "address": "string",
+      "sale_price": 0,
+      "sqft": 0,
+      "ppsf": 0,
+      "beds": 0,
+      "baths": 0,
+      "sale_date": "string",
+      "condition_comparison": "string (how this comp compares to subject property)",
+      "price_adjustment": "string (why subject is priced higher/lower than this comp)"
+    }
+  ],
+  "market_position": "string (where this property sits in the market — above/below/at market value and why)",
+  "value_justification": "string (3-4 sentences explaining why the price is fair/competitive)",
+  "investment_outlook": "string (appreciation potential, rental potential, market trajectory)",
+  "neighborhood_highlights": ["string (5-7 neighborhood selling points)"],
+  "price_per_sqft_analysis": "string (how this property's $/sqft compares to area average)"
+}`;
+
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.buyerCMA)) as BuyerCMAModule | null;
+}
+
+// ---------------------------------------------------------------------------
+// Module 8 — Open House
+// ---------------------------------------------------------------------------
+
+export async function generateOpenHouse(
+  report: Report,
+  rentcastData: RentcastData,
+  amenities: NearbyAmenities | null,
+  ctx: PropertyContext
+): Promise<OpenHouseModule | null> {
+  const system =
+    'You are an experienced Florida listing agent preparing for an open house. Create practical, professional materials that help the agent run a successful open house and convert visitors to offers.';
+
+  const prompt = `Using the property context above, create a complete open house package.
+
+Return JSON with this exact structure:
+{
+  "property_fact_sheet": "string (formatted property overview suitable for a one-page handout — include address, beds, baths, sqft, year built, lot size, price, key features, HOA info if applicable)",
+  "feature_highlights": ["string (10-12 standout features to emphasize during tours)"],
+  "neighborhood_info": "string (paragraph about the neighborhood — schools, dining, shopping, lifestyle)",
+  "agent_talking_points": ["string (8-10 key talking points for the agent during showings)"],
+  "objection_handlers": [
+    {
+      "objection": "string (common buyer objection)",
+      "response": "string (professional response)"
+    }
+  ],
+  "follow_up_email_template": "string (email to send to open house visitors after the event)"
+}`;
+
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.openHouse)) as OpenHouseModule | null;
+}
+
+// ---------------------------------------------------------------------------
+// Module 9 — Market Snapshot
+// ---------------------------------------------------------------------------
+
+export async function generateMarketSnapshot(
+  report: Report,
+  rentcastData: RentcastData,
+  ctx: PropertyContext
+): Promise<MarketSnapshotModule | null> {
+  const system =
+    'You are a Florida real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual market data provided — do not fabricate statistics.';
+
+  const prompt = `Using the property context above (which includes real market data), create a neighborhood/market snapshot report.
+
+Return JSON with this exact structure:
+{
+  "market_summary": "string (3-4 sentence overview of current market conditions in this area)",
+  "median_price": 0,
+  "avg_price_per_sqft": 0,
+  "avg_days_on_market": 0,
+  "inventory_level": "string (Low/Moderate/High with context)",
+  "market_trend": "Rising|Stable|Declining",
+  "buyer_vs_seller_market": "string (which type and why)",
+  "price_trend_narrative": "string (how prices have moved recently and where they're heading)",
+  "best_time_to_list": "string (seasonal advice for this specific Florida market)",
+  "key_insights": ["string (5-7 actionable market insights)"],
+  "comparable_recent_sales": [
+    {
+      "address": "string",
+      "price": 0,
+      "sqft": 0,
+      "beds": 0,
+      "baths": 0,
+      "sold_date": "string",
+      "dom": 0
+    }
+  ]
+}`;
+
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.marketSnapshot)) as MarketSnapshotModule | null;
 }

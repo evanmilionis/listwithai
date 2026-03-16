@@ -43,6 +43,12 @@ export interface AgentSubscription {
   stripe_subscription_id: string;
   status: SubscriptionStatus;
   reports_run: number;
+  display_name: string | null;
+  brokerage: string | null;
+  phone: string | null;
+  license_number: string | null;
+  photo_url: string | null;
+  tagline: string | null;
 }
 
 // Lead (sales funnel / abandoned cart)
@@ -192,6 +198,10 @@ export interface ReportOutput {
   listing: ListingModule | null;
   legal: LegalModule | null;
   amenities: NearbyAmenities | null;
+  social_media?: SocialMediaModule | null;
+  buyer_cma?: BuyerCMAModule | null;
+  open_house?: OpenHouseModule | null;
+  market_snapshot?: MarketSnapshotModule | null;
 }
 
 export interface TimelineModule {
@@ -288,6 +298,71 @@ export interface LegalModule {
     typical_cost: string;
     when_to_call: string;
   };
+}
+
+export interface SocialMediaModule {
+  instagram_caption: string;
+  instagram_hashtags: string[];
+  facebook_post: string;
+  twitter_post: string;
+  linkedin_post: string;
+  short_form_video_script: string;
+  email_blast: string;
+}
+
+export interface BuyerCMAModule {
+  executive_summary: string;
+  property_highlights: string[];
+  comparable_sales: {
+    address: string;
+    sale_price: number;
+    sqft: number;
+    ppsf: number;
+    beds: number;
+    baths: number;
+    sale_date: string;
+    condition_comparison: string;
+    price_adjustment: string;
+  }[];
+  market_position: string;
+  value_justification: string;
+  investment_outlook: string;
+  neighborhood_highlights: string[];
+  price_per_sqft_analysis: string;
+}
+
+export interface OpenHouseModule {
+  property_fact_sheet: string;
+  feature_highlights: string[];
+  neighborhood_info: string;
+  agent_talking_points: string[];
+  objection_handlers: {
+    objection: string;
+    response: string;
+  }[];
+  follow_up_email_template: string;
+}
+
+export interface MarketSnapshotModule {
+  market_summary: string;
+  median_price: number;
+  avg_price_per_sqft: number;
+  avg_days_on_market: number;
+  inventory_level: string;
+  market_trend: 'Rising' | 'Stable' | 'Declining';
+  buyer_vs_seller_market: string;
+  price_trend_narrative: string;
+  best_time_to_list: string;
+  key_insights: string[];
+  comparable_recent_sales: {
+    address: string;
+    price: number;
+    sqft: number;
+    beds: number;
+    baths: number;
+    sold_date: string;
+    dom: number;
+  }[];
 }
 
 // Attorney data types
