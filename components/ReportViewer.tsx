@@ -1130,6 +1130,22 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
         {activeTab === 'mls' && <MLSAccess />}
         {activeTab === 'attorneys' && <AttorneysTab city={report.property_city} />}
       </div>
+
+      {/* Support banner */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">Something not right?</h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            If your property details are incorrect or you need changes to your report, contact us and we&apos;ll get it fixed.
+          </p>
+        </div>
+        <a
+          href={`mailto:support@listwithai.io?subject=Report Issue — ${report.property_address}&body=Report ID: ${report.id}%0A%0APlease describe the issue:%0A`}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-navy-800 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-700 whitespace-nowrap"
+        >
+          Contact Support
+        </a>
+      </div>
     </div>
   );
 }

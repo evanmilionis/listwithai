@@ -43,8 +43,13 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold text-sm mb-3">Legal</h4>
+            <h4 className="font-semibold text-sm mb-3">Support</h4>
             <ul className="space-y-2 text-sm text-slate-400">
+              <li>
+                <a href="mailto:support@listwithai.io" className="hover:text-white transition-colors">
+                  support@listwithai.io
+                </a>
+              </li>
               <li>
                 <span className="cursor-default">Privacy Policy</span>
               </li>
