@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateReport } from '@/lib/reportGenerator';
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const { reportId } = await request.json();

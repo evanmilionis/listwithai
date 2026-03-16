@@ -1,4 +1,5 @@
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
@@ -56,10 +57,12 @@ export async function POST(request: NextRequest) {
             console.error('Failed to update report:', updateError);
           }
 
-          // Fire-and-forget report generation
-          generateReport(reportId).catch((err) => {
+          // Await report generation (must complete before function ends on Vercel)
+          try {
+            await generateReport(reportId);
+          } catch (err) {
             console.error('Report generation failed:', err);
-          });
+          }
         }
 
         if (session.mode === 'subscription') {
