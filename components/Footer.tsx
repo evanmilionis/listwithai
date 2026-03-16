@@ -46,8 +46,8 @@ export default function Footer() {
             <h4 className="font-semibold text-sm mb-3">Support</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <a href="mailto:evanmilionis@gmail.com" className="hover:text-white transition-colors">
-                  evanmilionis@gmail.com
+                <a href="mailto:evangelos@univentureprop.com" className="hover:text-white transition-colors">
+                  evangelos@univentureprop.com
                 </a>
               </li>
               <li>
