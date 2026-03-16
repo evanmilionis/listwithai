@@ -864,7 +864,196 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
   };
 
   const handleDownload = () => {
-    window.print();
+    // Build a combined HTML document with all report sections
+    const output = report.report_output;
+    const rc = report.rentcast_data;
+    const prop = rc?.property;
+
+    let html = `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<title>ListAI Report - ${report.property_address}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.6; padding: 40px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 28px; color: #0f172a; margin-bottom: 4px; }
+  h2 { font-size: 22px; color: #0f172a; margin: 32px 0 16px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  h3 { font-size: 16px; color: #334155; margin: 16px 0 8px; }
+  p { margin-bottom: 8px; font-size: 14px; }
+  .subtitle { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 12px 0; }
+  .grid-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+  .grid-item dt { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  .grid-item dd { font-size: 14px; font-weight: 600; color: #0f172a; margin-top: 2px; }
+  .section { margin-bottom: 24px; }
+  .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin: 8px 0; }
+  .price-big { text-align: center; font-size: 36px; font-weight: 700; color: #065f46; margin: 16px 0; }
+  .badge { display: inline-block; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 600; margin-right: 6px; }
+  .badge-high { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+  .badge-medium { background: #fefce8; color: #854d0e; border-color: #fef08a; }
+  .badge-low { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+  .tip { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; margin: 6px 0; font-size: 13px; color: #1e40af; }
+  .warning { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin: 6px 0; font-size: 13px; color: #991b1b; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #f1f5f9; text-align: left; padding: 8px 10px; font-size: 11px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
+  .disclaimer { background: #fefce8; border: 1px solid #fef08a; border-radius: 8px; padding: 16px; margin: 24px 0; font-size: 12px; color: #854d0e; }
+  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; text-align: center; color: #94a3b8; font-size: 12px; }
+  ul { padding-left: 20px; margin: 8px 0; }
+  li { margin-bottom: 4px; font-size: 14px; }
+  .week-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .week-num { background: #0f172a; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+  @media print { body { padding: 20px; } }
+  .page-break { page-break-before: always; }
+</style>
+</head><body>`;
+
+    // Header
+    html += `<h1>${report.property_address}</h1>`;
+    html += `<p class="subtitle">${report.property_city}, ${report.property_state} ${report.property_zip} &bull; Generated ${new Date(report.created_at).toLocaleDateString()}</p>`;
+
+    // Property Summary
+    html += `<h2>Property Summary</h2>`;
+    html += `<div class="grid">`;
+    html += `<div class="grid-item"><dt>Bedrooms</dt><dd>${report.beds}</dd></div>`;
+    html += `<div class="grid-item"><dt>Bathrooms</dt><dd>${report.baths}</dd></div>`;
+    html += `<div class="grid-item"><dt>Square Footage</dt><dd>${report.sqft.toLocaleString()}</dd></div>`;
+    html += `<div class="grid-item"><dt>Condition</dt><dd>${getConditionLabel(report.condition_score)}</dd></div>`;
+    html += `<div class="grid-item"><dt>Asking Price</dt><dd>${formatCurrency(report.asking_price)}</dd></div>`;
+    html += `<div class="grid-item"><dt>Target Close</dt><dd>${report.target_close_date}</dd></div>`;
+    html += `</div>`;
+
+    if (prop) {
+      html += `<h3>Confirmed Details (Public Records)</h3><div class="grid">`;
+      if (prop.yearBuilt) html += `<div class="grid-item"><dt>Year Built</dt><dd>${prop.yearBuilt}</dd></div>`;
+      if (prop.lotSize) html += `<div class="grid-item"><dt>Lot Size</dt><dd>${prop.lotSize.toLocaleString()} sqft</dd></div>`;
+      if (prop.county) html += `<div class="grid-item"><dt>County</dt><dd>${prop.county}</dd></div>`;
+      if (prop.taxAssessedValue) html += `<div class="grid-item"><dt>Tax Assessed</dt><dd>${formatCurrency(prop.taxAssessedValue)}</dd></div>`;
+      html += `</div>`;
+    }
+
+    // Timeline
+    if (output?.timeline) {
+      const tl = output.timeline;
+      html += `<h2 class="page-break">Selling Timeline</h2>`;
+      html += `<p>${tl.timeline_summary}</p>`;
+      html += `<div class="grid">`;
+      html += `<div class="grid-item"><dt>List Date</dt><dd>${tl.recommended_list_date}</dd></div>`;
+      html += `<div class="grid-item"><dt>Est. Close</dt><dd>${tl.estimated_close_date}</dd></div>`;
+      html += `<div class="grid-item"><dt>Total Weeks</dt><dd>${tl.weeks.length}</dd></div>`;
+      html += `</div>`;
+      tl.weeks.forEach(week => {
+        html += `<div class="card"><div class="week-header"><span class="week-num">${week.week_number}</span><strong>${week.label}</strong></div>`;
+        week.tasks.forEach(task => {
+          html += `<p><span class="badge badge-${task.priority}">${task.priority}</span> <strong>${task.task}</strong> — ${task.description} <em>(${task.estimated_hours}h)</em></p>`;
+        });
+        html += `</div>`;
+      });
+      if (tl.florida_specific_tips.length > 0) {
+        html += `<h3>Florida Tips</h3>`;
+        tl.florida_specific_tips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
+      }
+      if (tl.seasonal_note) html += `<div class="tip">${tl.seasonal_note}</div>`;
+    }
+
+    // Improvements
+    if (output?.improvements) {
+      const imp = output.improvements;
+      html += `<h2 class="page-break">Improvement Recommendations</h2>`;
+      html += `<p>${imp.summary}</p>`;
+      html += `<div class="grid" style="grid-template-columns: 1fr 1fr;">`;
+      html += `<div class="grid-item"><dt>Total Investment</dt><dd>${imp.total_estimated_investment}</dd></div>`;
+      html += `<div class="grid-item"><dt>Value Increase</dt><dd>${imp.potential_value_increase}</dd></div>`;
+      html += `</div>`;
+      [...imp.recommendations].sort((a, b) => a.priority - b.priority).forEach(rec => {
+        html += `<div class="card"><h3>#${rec.priority} ${rec.area}${rec.diy_friendly ? ' (DIY Friendly)' : ''}</h3>`;
+        html += `<p>${rec.recommendation}</p><p><em>${rec.why}</em></p>`;
+        html += `<p><span class="badge">Cost: ${rec.estimated_cost}</span><span class="badge">ROI: ${rec.estimated_roi}</span><span class="badge">Time: ${rec.time_to_complete}</span></p></div>`;
+      });
+      if (imp.things_to_avoid.length > 0) {
+        html += `<h3>Things to Avoid</h3>`;
+        imp.things_to_avoid.forEach(item => { html += `<div class="warning">${item}</div>`; });
+      }
+      if (imp.florida_staging_tips.length > 0) {
+        html += `<h3>Florida Staging Tips</h3>`;
+        imp.florida_staging_tips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
+      }
+    }
+
+    // Pricing
+    if (output?.pricing) {
+      const pr = output.pricing;
+      html += `<h2 class="page-break">Pricing Analysis</h2>`;
+      html += `<div class="price-big">${formatCurrency(pr.recommended_list_price)}</div>`;
+      html += `<p style="text-align:center;color:#64748b;">Recommended List Price</p>`;
+      html += `<div class="grid">`;
+      html += `<div class="grid-item"><dt>Aggressive</dt><dd>${formatCurrency(pr.price_range.aggressive)}</dd></div>`;
+      html += `<div class="grid-item"><dt>Conservative</dt><dd>${formatCurrency(pr.price_range.conservative)}</dd></div>`;
+      html += `<div class="grid-item"><dt>Negotiation Floor</dt><dd>${formatCurrency(pr.negotiation_floor)}</dd></div>`;
+      html += `<div class="grid-item"><dt>$/SqFt</dt><dd>${pr.price_per_sqft > 0 ? formatCurrency(pr.price_per_sqft) : 'N/A'}</dd></div>`;
+      html += `<div class="grid-item"><dt>Market Avg $/SqFt</dt><dd>${pr.market_avg_ppsf > 0 ? formatCurrency(pr.market_avg_ppsf) : 'N/A'}</dd></div>`;
+      html += `<div class="grid-item"><dt>DOM Prediction</dt><dd>${pr.days_on_market_prediction}</dd></div>`;
+      html += `</div>`;
+      html += `<div class="card"><h3>Pricing Strategy</h3><p>${pr.pricing_strategy}</p></div>`;
+      if (pr.florida_market_context) html += `<div class="tip">${pr.florida_market_context}</div>`;
+
+      if (pr.comparable_analysis.length > 0) {
+        html += `<h3>Comparable Sales</h3><table><thead><tr><th>Address</th><th>Price</th><th>SqFt</th><th>$/SqFt</th><th>Beds</th><th>Baths</th><th>Date</th></tr></thead><tbody>`;
+        pr.comparable_analysis.forEach(comp => {
+          html += `<tr><td>${comp.address}</td><td>${formatCurrency(comp.sale_price)}</td><td>${comp.sqft.toLocaleString()}</td><td>${formatCurrency(comp.ppsf)}</td><td>${comp.beds}</td><td>${comp.baths}</td><td>${comp.sale_date}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+    }
+
+    // Listing Copy
+    if (output?.listing) {
+      const l = output.listing;
+      html += `<h2 class="page-break">Listing Copy</h2>`;
+      html += `<div class="card" style="text-align:center;"><h3 style="font-size:20px;">${l.headline}</h3><p><em>${l.tagline}</em></p></div>`;
+      html += `<h3>Full Description</h3><p>${l.full_description}</p>`;
+      html += `<h3>Short Description</h3><p>${l.short_description}</p>`;
+      html += `<h3>Bullet Highlights</h3><ul>`;
+      l.bullet_highlights.forEach(b => { html += `<li>${b}</li>`; });
+      html += `</ul>`;
+      html += `<h3>Open House Description</h3><p>${l.open_house_description}</p>`;
+      html += `<h3>SEO Keywords</h3><p>`;
+      l.seo_keywords.forEach(kw => { html += `<span class="badge">${kw}</span>`; });
+      html += `</p>`;
+    }
+
+    // Legal
+    if (output?.legal) {
+      const legal = output.legal;
+      html += `<h2 class="page-break">Legal Package</h2>`;
+      html += `<div class="disclaimer">${legal.disclaimer}</div>`;
+      legal.documents.forEach(doc => {
+        html += `<div class="card"><h3>${doc.document_name}</h3><p><em>${doc.description}</em></p>`;
+        html += `<pre style="white-space:pre-wrap;font-size:12px;background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin:8px 0;">${doc.template}</pre>`;
+        if (doc.key_clauses_explained.length > 0) {
+          html += `<h3>Key Clauses</h3>`;
+          doc.key_clauses_explained.forEach(kc => {
+            html += `<p><strong>${kc.clause}:</strong> ${kc.plain_english}</p>`;
+          });
+        }
+        html += `</div>`;
+      });
+    }
+
+    // Footer
+    html += `<div class="footer">Generated by ListAI &bull; listwithai.io &bull; ${new Date().toLocaleDateString()}<br>This report is AI-generated guidance and does not constitute legal or real estate advice.</div>`;
+    html += `</body></html>`;
+
+    // Create and download the HTML file as a clean document
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ListAI-Report-${report.property_address.replace(/[^a-zA-Z0-9]/g, '-')}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -886,7 +1075,7 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
             <Download className="h-4 w-4" />
-            Download PDF
+            Download Report
           </button>
           <div className="relative">
             <button

@@ -106,6 +106,9 @@ export function buildPropertyContext(
   rentcastData: RentcastData,
   amenities: NearbyAmenities | null
 ): PropertyContext {
+  // Extract form metadata if stored in report_output
+  const formMeta = (report.report_output as unknown as Record<string, unknown>)?.form_metadata as Record<string, unknown> | undefined;
+
   const text = JSON.stringify({
     property: {
       address:      `${report.property_address}, ${report.property_city}, ${report.property_state} ${report.property_zip}`,
@@ -117,6 +120,16 @@ export function buildPropertyContext(
       askingPrice:  report.asking_price,
       targetClose:  report.target_close_date,
       sellerName:   report.customer_name,
+      ...(formMeta ? {
+        recentlyUpdated: formMeta.recently_updated,
+        updatedAreas:    formMeta.updated_areas,
+        otherImprovements: formMeta.other_improvements,
+        propertyType:    formMeta.property_type,
+        yearBuilt:       formMeta.year_built,
+        lotSize:         formMeta.lot_size,
+        mortgageStatus:  formMeta.mortgage_status,
+        flexibleOnPrice: formMeta.flexible_on_price,
+      } : {}),
     },
     rentcast:   trimRentcast(rentcastData),
     amenities:  trimAmenities(amenities),
@@ -274,6 +287,8 @@ export async function generateImprovements(
     'You are an expert Florida home stager and real estate consultant who specializes in maximizing FSBO sale prices through strategic low-cost improvements. Always prioritize ROI.';
 
   const prompt = `Using the property context above, recommend specific improvements to maximize sale price.
+
+IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Acknowledge what the seller has already done, estimate how those improvements affect value, and adjust your recommendations accordingly. Do NOT recommend improvements the seller has already completed.
 
 Return JSON with this exact structure:
 {

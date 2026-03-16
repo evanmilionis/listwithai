@@ -47,6 +47,18 @@ export async function POST(request: NextRequest) {
         status: 'pending',
         sold_status: 'unknown',
         followup_stage: 0,
+        report_output: {
+          form_metadata: {
+            recently_updated: formData.recently_updated,
+            updated_areas: formData.updated_areas,
+            other_improvements: formData.other_improvements || '',
+            property_type: formData.property_type,
+            year_built: formData.year_built,
+            lot_size: formData.lot_size,
+            mortgage_status: formData.mortgage_status,
+            flexible_on_price: formData.flexible_on_price,
+          },
+        },
       })
       .select()
       .single();

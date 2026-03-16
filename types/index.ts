@@ -90,6 +90,7 @@ export interface IntakeFormData {
   target_close_date: string;
   recently_updated: boolean;
   updated_areas: string[];
+  other_improvements: string;
   mortgage_status: 'Own free & clear' | 'Has mortgage' | 'Unknown';
   flexible_on_price: boolean;
   // Step 3: Contact
