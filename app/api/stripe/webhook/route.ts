@@ -3,13 +3,30 @@ export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import getStripe from '@/lib/stripe';
 import { generateReport } from '@/lib/reportGenerator';
 import Stripe from 'stripe';
 
+// Initialize Stripe directly to avoid any import issues
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2024-06-20' as Stripe.LatestApiVersion,
+});
+
 export async function POST(request: NextRequest) {
-  const body = await request.text();
+  console.log('Webhook received');
+  console.log('STRIPE_WEBHOOK_SECRET exists:', !!process.env.STRIPE_WEBHOOK_SECRET);
+  console.log('STRIPE_SECRET_KEY exists:', !!process.env.STRIPE_SECRET_KEY);
+
+  let body: string;
+  try {
+    body = await request.text();
+    console.log('Body length:', body.length);
+  } catch (err) {
+    console.error('Failed to read body:', err);
+    return NextResponse.json({ error: 'Failed to read body' }, { status: 400 });
+  }
+
   const sig = request.headers.get('stripe-signature');
+  console.log('Signature exists:', !!sig);
 
   if (!sig) {
     return NextResponse.json(
@@ -21,15 +38,16 @@ export async function POST(request: NextRequest) {
   let event: Stripe.Event;
 
   try {
-    event = getStripe().webhooks.constructEvent(
+    event = stripe.webhooks.constructEvent(
       body,
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     );
+    console.log('Event verified:', event.type);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return NextResponse.json(
-      { error: 'Webhook signature verification failed' },
+      { error: 'Webhook signature verification failed', details: String(err) },
       { status: 400 }
     );
   }
@@ -40,9 +58,11 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
+        console.log('Checkout session completed:', session.id);
+        console.log('Report ID from metadata:', session.metadata?.report_id);
+        console.log('Session mode:', session.mode);
 
         if (session.metadata?.report_id) {
-          // Homeowner payment completed
           const reportId = session.metadata.report_id;
 
           const { error: updateError } = await supabase
@@ -55,18 +75,21 @@ export async function POST(request: NextRequest) {
 
           if (updateError) {
             console.error('Failed to update report:', updateError);
+          } else {
+            console.log('Report status set to processing');
           }
 
-          // Await report generation (must complete before function ends on Vercel)
+          // Await report generation
           try {
+            console.log('Starting report generation...');
             await generateReport(reportId);
+            console.log('Report generation completed');
           } catch (err) {
             console.error('Report generation failed:', err);
           }
         }
 
         if (session.mode === 'subscription') {
-          // Agent subscription created
           const { error: subError } = await supabase
             .from('agent_subscriptions')
             .insert({
@@ -120,6 +143,7 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    console.log('Webhook handler complete, returning 200');
     return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
     console.error('Webhook handler error:', error);
