@@ -34,11 +34,11 @@ const MODEL = 'claude-sonnet-4-6';
 // Per-module token ceilings — sized to what each module actually needs.
 // Cuts wasteful reserved-but-unused tokens billed on every call.
 const MODULE_MAX_TOKENS = {
-  timeline:     3000,
-  improvements: 2500,
-  pricing:      2500,
-  listingCopy:  2000,
-  legal:        8192, // templates are genuinely long; was 16384 — halved
+  timeline:     8192,
+  improvements: 6000,
+  pricing:      6000,
+  listingCopy:  4096,
+  legal:        8192,
 } as const;
 
 // ---------------------------------------------------------------------------
