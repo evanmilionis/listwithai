@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
 import IntakeForm from '@/components/IntakeForm';
@@ -11,6 +11,45 @@ export default function NewReportPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingReportId, setPendingReportId] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Poll for report completion
+  useEffect(() => {
+    if (!pendingReportId) return;
+
+    pollRef.current = setInterval(async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('reports')
+        .select('status')
+        .eq('id', pendingReportId)
+        .single();
+
+      if (data?.status === 'complete') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        router.push(`/dashboard/report/${pendingReportId}`);
+      } else if (data?.status === 'failed') {
+        if (pollRef.current) clearInterval(pollRef.current);
+        setError('Report generation failed. Please try again.');
+        setIsLoading(false);
+        setPendingReportId(null);
+      }
+    }, 5000);
+
+    // Timeout after 5 minutes
+    const timeout = setTimeout(() => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      setError('Report is taking longer than expected. Check your dashboard for updates.');
+      setIsLoading(false);
+      setPendingReportId(null);
+    }, 300000);
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      clearTimeout(timeout);
+    };
+  }, [pendingReportId, router]);
 
   const handleSubmit = async (data: IntakeFormData) => {
     setIsLoading(true);
@@ -49,6 +88,18 @@ export default function NewReportPage() {
           stripe_session_id: '',
           sold_status: 'unknown' as const,
           followup_stage: 0,
+          report_output: {
+            form_metadata: {
+              recently_updated: data.recently_updated,
+              updated_areas: data.updated_areas,
+              other_improvements: data.other_improvements || '',
+              property_type: data.property_type,
+              year_built: data.year_built,
+              lot_size: data.lot_size,
+              mortgage_status: data.mortgage_status,
+              flexible_on_price: data.flexible_on_price,
+            },
+          },
         })
         .select()
         .single();
@@ -56,6 +107,9 @@ export default function NewReportPage() {
       if (insertError || !report) {
         throw new Error(insertError?.message ?? 'Failed to create report');
       }
+
+      // Start polling for completion
+      setPendingReportId(report.id);
 
       // Trigger report generation
       const res = await fetch('/api/report/generate', {
@@ -68,12 +122,10 @@ export default function NewReportPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error ?? 'Failed to generate report');
       }
-
-      // Redirect to the report view
-      router.push(`/dashboard/report/${report.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setIsLoading(false);
+      setPendingReportId(null);
     }
   };
 
@@ -97,7 +149,7 @@ export default function NewReportPage() {
           <Loader2 className="w-8 h-8 text-slate-900 animate-spin mb-4" />
           <p className="text-lg font-medium text-slate-900">Generating Report...</p>
           <p className="text-sm text-slate-500 mt-1">
-            This usually takes 30-60 seconds.
+            This usually takes 30-60 seconds. You&apos;ll be redirected automatically.
           </p>
         </div>
       ) : (
