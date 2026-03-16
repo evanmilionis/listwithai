@@ -233,15 +233,37 @@ export async function generateReport(reportId: string): Promise<void> {
 
     // -----------------------------------------------------------------------
     // 6. Send notification email (first generation only)
-    //    BUG FIX: was `if (true)` — now correctly uses isRegeneration flag
+    //    For agent reports: send to client AND agent (separate emails)
     // -----------------------------------------------------------------------
     if (!isRegeneration) {
-      await sendReportReadyEmail(
-        typedReport.customer_email,
-        typedReport.customer_name,
-        reportUrl
-      );
-      console.log('Notification email sent');
+      const formMeta = (typedReport.report_output as unknown as Record<string, unknown>)?.form_metadata as Record<string, string> | undefined;
+
+      if (typedReport.customer_type === 'agent' && formMeta) {
+        const agentEmail = formMeta.agent_email;
+        const agentName = formMeta.agent_name;
+        const clientEmail = formMeta.client_email || typedReport.customer_email;
+        const clientName = typedReport.customer_name;
+
+        // Send to client (if we have their email and it's different from agent's)
+        if (clientEmail && clientEmail !== agentEmail) {
+          await sendReportReadyEmail(clientEmail, clientName, reportUrl);
+          console.log(`Client notification sent to ${clientEmail}`);
+        }
+
+        // Always send to agent
+        if (agentEmail) {
+          await sendReportReadyEmail(agentEmail, agentName || 'Agent', reportUrl);
+          console.log(`Agent notification sent to ${agentEmail}`);
+        }
+      } else {
+        // Homeowner report — send to the customer
+        await sendReportReadyEmail(
+          typedReport.customer_email,
+          typedReport.customer_name,
+          reportUrl
+        );
+      }
+      console.log('Notification email(s) sent');
     } else {
       console.log('Skipping email (regeneration)');
     }

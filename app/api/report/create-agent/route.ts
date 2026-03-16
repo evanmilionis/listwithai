@@ -33,17 +33,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Use client info if provided, otherwise fall back to agent info
-    const reportName = formData.client_name?.trim() || formData.customer_name;
-    const reportEmail = formData.client_email?.trim() || formData.customer_email;
+    // Use client info for the report recipient, keep agent info for notifications
+    const clientName = formData.client_name?.trim() || formData.customer_name;
+    const clientEmail = formData.client_email?.trim() || '';
+    const agentName = formData.customer_name;
+    const agentEmail = formData.customer_email;
 
-    // Create the report using the service client (bypasses RLS)
+    // customer_email/customer_name = client info (who the report is "for")
+    // agent info stored in form_metadata so we can notify both
     const { data: report, error: insertError } = await supabase
       .from('reports')
       .insert({
         user_id: userId,
-        customer_email: reportEmail,
-        customer_name: reportName,
+        customer_email: clientEmail || agentEmail,
+        customer_name: clientName,
         property_address: formData.property_address,
         property_city: formData.property_city,
         property_state: formData.property_state,
@@ -69,6 +72,9 @@ export async function POST(request: NextRequest) {
             lot_size: formData.lot_size,
             mortgage_status: formData.mortgage_status,
             flexible_on_price: formData.flexible_on_price,
+            agent_name: agentName,
+            agent_email: agentEmail,
+            client_email: clientEmail,
           },
         },
       })

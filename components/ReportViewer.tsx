@@ -475,9 +475,9 @@ function PricingAnalysis({ report }: { report: Report }) {
 
       {/* Florida market context */}
       {pr.florida_market_context && (
-        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-start gap-3">
-          <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-blue-900">{pr.florida_market_context}</p>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Florida Market Context</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{pr.florida_market_context}</p>
         </div>
       )}
 
