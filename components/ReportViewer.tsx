@@ -440,11 +440,9 @@ function PricingAnalysis({ report }: { report: Report }) {
 
       {/* Assessment & strategy */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Owner Price Assessment</p>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm font-semibold text-blue-700">
-            {pr.owner_price_assessment}
-          </span>
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:col-span-2">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Owner Price Assessment</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{pr.owner_price_assessment}</p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Days on Market Prediction</p>

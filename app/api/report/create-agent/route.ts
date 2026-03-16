@@ -33,13 +33,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use client info if provided, otherwise fall back to agent info
+    const reportName = formData.client_name?.trim() || formData.customer_name;
+    const reportEmail = formData.client_email?.trim() || formData.customer_email;
+
     // Create the report using the service client (bypasses RLS)
     const { data: report, error: insertError } = await supabase
       .from('reports')
       .insert({
         user_id: userId,
-        customer_email: formData.customer_email,
-        customer_name: formData.customer_name,
+        customer_email: reportEmail,
+        customer_name: reportName,
         property_address: formData.property_address,
         property_city: formData.property_city,
         property_state: formData.property_state,
