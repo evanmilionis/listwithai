@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
             recently_updated: formData.recently_updated,
             updated_areas: formData.updated_areas,
             other_improvements: formData.other_improvements || '',
+            home_features: formData.home_features || '',
             property_type: formData.property_type,
             year_built: formData.year_built,
             lot_size: formData.lot_size,

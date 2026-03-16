@@ -132,6 +132,7 @@ export function buildPropertyContext(
         recentlyUpdated: formMeta.recently_updated,
         updatedAreas:    formMeta.updated_areas,
         otherImprovements: formMeta.other_improvements,
+        homeFeatures:    formMeta.home_features,
         propertyType:    formMeta.property_type,
         yearBuilt:       formMeta.year_built,
         lotSize:         formMeta.lot_size,

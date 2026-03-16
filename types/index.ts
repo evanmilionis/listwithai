@@ -90,6 +90,7 @@ export interface IntakeFormData {
   sqft: number;
   year_built: number;
   lot_size: number | null;
+  home_features: string;
   // Step 2: Selling details
   condition_score: number;
   asking_price: number;
