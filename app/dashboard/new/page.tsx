@@ -19,21 +19,22 @@ export default function NewReportPage() {
     if (!pendingReportId) return;
 
     pollRef.current = setInterval(async () => {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from('reports')
-        .select('status')
-        .eq('id', pendingReportId)
-        .single();
+      try {
+        const res = await fetch(`/api/report/${pendingReportId}`);
+        if (!res.ok) return;
+        const data = await res.json();
 
-      if (data?.status === 'complete') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        router.push(`/dashboard/report/${pendingReportId}`);
-      } else if (data?.status === 'failed') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setError('Report generation failed. Please try again.');
-        setIsLoading(false);
-        setPendingReportId(null);
+        if (data?.status === 'complete') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          router.push(`/dashboard/report/${pendingReportId}`);
+        } else if (data?.status === 'failed') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setError('Report generation failed. Please try again.');
+          setIsLoading(false);
+          setPendingReportId(null);
+        }
+      } catch {
+        // Ignore poll errors
       }
     }, 5000);
 
@@ -66,62 +67,24 @@ export default function NewReportPage() {
         return;
       }
 
-      // Create report directly in Supabase (no Stripe payment for agents)
-      const { data: report, error: insertError } = await supabase
-        .from('reports')
-        .insert({
-          user_id: session.user.id,
-          customer_email: data.customer_email,
-          customer_name: data.customer_name,
-          property_address: data.property_address,
-          property_city: data.property_city,
-          property_state: data.property_state,
-          property_zip: data.property_zip,
-          beds: data.beds,
-          baths: data.baths,
-          sqft: data.sqft,
-          condition_score: data.condition_score,
-          asking_price: data.asking_price,
-          target_close_date: data.target_close_date,
-          customer_type: 'agent' as const,
-          status: 'pending' as const,
-          stripe_session_id: '',
-          sold_status: 'unknown' as const,
-          followup_stage: 0,
-          report_output: {
-            form_metadata: {
-              recently_updated: data.recently_updated,
-              updated_areas: data.updated_areas,
-              other_improvements: data.other_improvements || '',
-              property_type: data.property_type,
-              year_built: data.year_built,
-              lot_size: data.lot_size,
-              mortgage_status: data.mortgage_status,
-              flexible_on_price: data.flexible_on_price,
-            },
-          },
-        })
-        .select()
-        .single();
+      // Create report + trigger generation via server API (bypasses RLS)
+      const res = await fetch('/api/report/create-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: session.user.id,
+          formData: data,
+        }),
+      });
 
-      if (insertError || !report) {
-        throw new Error(insertError?.message ?? 'Failed to create report');
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error ?? 'Failed to create report');
       }
 
       // Start polling for completion
-      setPendingReportId(report.id);
-
-      // Trigger report generation
-      const res = await fetch('/api/report/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportId: report.id }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? 'Failed to generate report');
-      }
+      setPendingReportId(result.reportId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
       setIsLoading(false);
