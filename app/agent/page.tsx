@@ -44,6 +44,20 @@ export default function AgentPage() {
     setSignInError('');
 
     try {
+      // First check if this email has an active agent subscription
+      const checkRes = await fetch('/api/agent/check-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: signInEmail }),
+      });
+      const checkData = await checkRes.json();
+
+      if (!checkData.hasSubscription) {
+        setSignInError('No active agent subscription found for this email. Subscribe above to get started.');
+        setSignInLoading(false);
+        return;
+      }
+
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOtp({
         email: signInEmail,
