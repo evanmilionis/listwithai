@@ -212,6 +212,7 @@ export default function IntakeForm({
   const [form, setForm] = useState<IntakeFormData>(getDefaultFormData);
   const [errors, setErrors] = useState<StepErrors>({});
   const [priceDisplay, setPriceDisplay] = useState('');
+  const [addressValidating, setAddressValidating] = useState(false);
   const leadIdRef = useRef<string | null>(null);
 
   // ------- lead capture (silent, non-blocking) -------
@@ -348,12 +349,38 @@ export default function IntakeForm({
 
   // ------- navigation -------
 
-  const goNext = () => {
-    if (validators[step - 1]()) {
-      // Silently capture lead data for the completed step
-      captureLeadData(step);
-      setStep((s) => Math.min(s + 1, 3));
+  const goNext = async () => {
+    if (!validators[step - 1]()) return;
+
+    // Validate address when leaving Step 1
+    if (step === 1) {
+      setAddressValidating(true);
+      try {
+        const res = await fetch('/api/validate-address', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: form.property_address,
+            city: form.property_city,
+            state: form.property_state,
+            zipCode: form.property_zip,
+          }),
+        });
+        const data = await res.json();
+        if (!data.valid) {
+          setErrors({ property_address: data.message || 'We couldn\'t verify this address. Please double-check and try again.' });
+          setAddressValidating(false);
+          return;
+        }
+      } catch {
+        // If validation service is down, don't block the user
+      }
+      setAddressValidating(false);
     }
+
+    // Silently capture lead data for the completed step
+    captureLeadData(step);
+    setStep((s) => Math.min(s + 1, 3));
   };
 
   const goBack = () => setStep((s) => Math.max(s - 1, 1));
@@ -816,8 +843,8 @@ export default function IntakeForm({
             )}
 
             {step < 3 ? (
-              <Button type="button" onClick={goNext}>
-                Next
+              <Button type="button" onClick={goNext} disabled={addressValidating}>
+                {addressValidating ? 'Verifying Address...' : 'Next'}
               </Button>
             ) : (
               <Button type="submit" disabled={isLoading}>
