@@ -30,6 +30,7 @@ export default function AgentReportPage() {
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [sendingFollowUp, setSendingFollowUp] = useState(false);
   const [followUpSent, setFollowUpSent] = useState<string | null>(null);
+  const [stagingCredits, setStagingCredits] = useState(0);
 
   const loadReport = async () => {
     const supabase = createClient();
@@ -54,6 +55,14 @@ export default function AgentReportPage() {
       setLoading(false);
       return;
     }
+
+    // Fetch staging credits
+    const { data: sub } = await supabase
+      .from('agent_subscriptions')
+      .select('staging_credits')
+      .eq('user_id', session.user.id)
+      .single();
+    if (sub) setStagingCredits(sub.staging_credits ?? 0);
 
     setReport(data);
     setLoading(false);
@@ -280,7 +289,7 @@ export default function AgentReportPage() {
       )}
 
       {/* Report content */}
-      <ReportViewer report={report} agentMode />
+      <ReportViewer report={report} agentMode stagingCredits={stagingCredits} />
     </div>
   );
 }

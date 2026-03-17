@@ -7,6 +7,7 @@ import type { Report, SocialMediaModule, BuyerCMAModule, OpenHouseModule, Market
 import Disclaimer from '@/components/Disclaimer';
 import MLSReferral from '@/components/MLSReferral';
 import AttorneyCards from '@/components/AttorneyCards';
+import StagingTab from '@/components/StagingTab';
 import {
   Copy,
   Download,
@@ -29,11 +30,13 @@ import {
   BarChart3,
   Building,
   Megaphone,
+  Sofa,
 } from 'lucide-react';
 
 interface ReportViewerProps {
   report: Report;
   agentMode?: boolean;
+  stagingCredits?: number;
 }
 
 const TABS = [
@@ -52,6 +55,7 @@ const AGENT_TABS = [
   { key: 'buyercma', label: 'Buyer CMA', icon: BarChart3 },
   { key: 'openhouse', label: 'Open House', icon: Building },
   { key: 'market', label: 'Market', icon: TrendingUp },
+  { key: 'staging', label: 'Virtual Staging', icon: Sofa },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'] | (typeof AGENT_TABS)[number]['key'];
@@ -825,7 +829,7 @@ function EmptyTab({ message }: { message: string }) {
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
-export default function ReportViewer({ report, agentMode = false }: ReportViewerProps) {
+export default function ReportViewer({ report, agentMode = false, stagingCredits = 0 }: ReportViewerProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
   const filteredTabs = agentMode
     ? TABS.filter((t) => t.key !== 'legal' && t.key !== 'mls')
@@ -1477,6 +1481,13 @@ export default function ReportViewer({ report, agentMode = false }: ReportViewer
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === 'staging' && (
+          <StagingTab
+            reportId={report.id}
+            stagingCredits={stagingCredits}
+          />
         )}
       </div>
 

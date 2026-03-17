@@ -70,6 +70,27 @@ export async function POST(request: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
 
+        // ── Staging credit purchase ─────────────────────────────
+        if (session.metadata?.type === 'staging_credits') {
+          const userId  = session.metadata.user_id;
+          const credits = parseInt(session.metadata.credits ?? '0', 10);
+
+          const { data: sub } = await supabase
+            .from('agent_subscriptions')
+            .select('id, staging_credits')
+            .eq('user_id', userId)
+            .single();
+
+          if (sub) {
+            await supabase
+              .from('agent_subscriptions')
+              .update({ staging_credits: (sub.staging_credits ?? 0) + credits })
+              .eq('id', sub.id);
+            console.log(`Added ${credits} staging credits to user ${userId}`);
+          }
+          break;
+        }
+
         if (session.metadata?.report_id) {
           const reportId = session.metadata.report_id;
 
