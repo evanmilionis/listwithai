@@ -15,8 +15,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
-type RoomType = 'living_room' | 'bedroom' | 'dining_room' | 'kitchen' | 'bathroom' | 'office';
-type RoomStyle = 'modern' | 'coastal' | 'traditional' | 'scandinavian' | 'industrial' | 'farmhouse';
+type RoomType = 'livingroom' | 'bedroom' | 'diningroom' | 'kitchen' | 'bathroom' | 'office';
+type RoomStyle = 'modern' | 'coastal' | 'traditional' | 'scandinavian' | 'industrial' | 'farmhouse' | 'minimalist' | 'boho' | 'midcenturymodern' | 'contemporary' | 'transitional';
 
 interface StagingJob {
   id: string;
@@ -35,21 +35,26 @@ interface Props {
 }
 
 const ROOM_TYPES: { value: RoomType; label: string }[] = [
-  { value: 'living_room', label: 'Living Room' },
+  { value: 'livingroom',  label: 'Living Room' },
   { value: 'bedroom',     label: 'Bedroom' },
-  { value: 'dining_room', label: 'Dining Room' },
+  { value: 'diningroom',  label: 'Dining Room' },
   { value: 'kitchen',     label: 'Kitchen' },
   { value: 'bathroom',    label: 'Bathroom' },
   { value: 'office',      label: 'Office / Den' },
 ];
 
 const STYLES: { value: RoomStyle; label: string; desc: string }[] = [
-  { value: 'modern',        label: 'Modern',       desc: 'Clean lines, neutral tones' },
-  { value: 'coastal',       label: 'Coastal',      desc: 'Light, airy, beach-inspired (FL favorite)' },
-  { value: 'traditional',   label: 'Traditional',  desc: 'Classic, warm, timeless' },
-  { value: 'scandinavian',  label: 'Scandinavian', desc: 'Minimal, functional, cozy' },
-  { value: 'industrial',    label: 'Industrial',   desc: 'Raw materials, urban feel' },
-  { value: 'farmhouse',     label: 'Farmhouse',    desc: 'Rustic, warm, welcoming' },
+  { value: 'modern',           label: 'Modern',          desc: 'Clean lines, neutral tones' },
+  { value: 'coastal',          label: 'Coastal',         desc: 'Light, airy, beach-inspired (FL favorite)' },
+  { value: 'traditional',      label: 'Traditional',     desc: 'Classic, warm, timeless' },
+  { value: 'scandinavian',     label: 'Scandinavian',    desc: 'Minimal, functional, cozy' },
+  { value: 'industrial',       label: 'Industrial',      desc: 'Raw materials, urban feel' },
+  { value: 'farmhouse',        label: 'Farmhouse',       desc: 'Rustic, warm, welcoming' },
+  { value: 'minimalist',       label: 'Minimalist',      desc: 'Less is more, open spaces' },
+  { value: 'boho',             label: 'Boho',            desc: 'Eclectic, colorful, relaxed' },
+  { value: 'midcenturymodern', label: 'Mid-Century',     desc: 'Retro elegance, organic shapes' },
+  { value: 'contemporary',     label: 'Contemporary',    desc: 'Current trends, bold accents' },
+  { value: 'transitional',     label: 'Transitional',    desc: 'Traditional meets modern' },
 ];
 
 const CREDIT_PACKS = [
@@ -71,7 +76,7 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
   const [polling, setPolling]         = useState(false);
   const [imageFile, setImageFile]     = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [roomType, setRoomType]       = useState<RoomType>('living_room');
+  const [roomType, setRoomType]       = useState<RoomType>('livingroom');
   const [style, setStyle]             = useState<RoomStyle>('coastal');
   const [error, setError]             = useState<string | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
@@ -180,16 +185,27 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
   }
 
   async function handleBuyCredits(pack: string) {
-    const token = await getAuthToken();
-    if (!token) return;
+    try {
+      setError(null);
+      const token = await getAuthToken();
+      if (!token) { setError('Please sign in to continue'); return; }
 
-    const res = await fetch('/api/stripe/checkout/staging', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ pack }),
-    });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
+      const res = await fetch('/api/stripe/checkout/staging', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ pack }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to start checkout');
+        return;
+      }
+      if (data.url) window.location.href = data.url;
+      else setError('No checkout URL returned');
+    } catch (err) {
+      console.error('Buy credits error:', err);
+      setError('Something went wrong. Please try again.');
+    }
   }
 
   return (
@@ -474,8 +490,13 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
                 </button>
               ))}
             </div>
+            {error && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 13, marginBottom: 12 }}>
+                {error}
+              </div>
+            )}
             <button
-              onClick={() => setShowBuyModal(false)}
+              onClick={() => { setShowBuyModal(false); setError(null); }}
               style={{ width: '100%', padding: '11px 0', border: '1px solid #e5e7eb', borderRadius: 8, background: '#fff', color: '#6b7280', cursor: 'pointer', fontSize: 14 }}
             >
               Cancel

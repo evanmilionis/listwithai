@@ -8,10 +8,10 @@
  *   1. Auth check — must be signed-in agent
  *   2. Credit check — must have staging_credits > 0
  *   3. Upload image to Supabase Storage (public bucket)
- *   4. Create staging_jobs row (status: pending)
+ *   4. Create staging_jobs row (status: processing)
  *   5. Deduct 1 credit
- *   6. Call REimagineHome API → get job_id
- *   7. Poll for result (runs async — returns job id immediately, client polls)
+ *   6. Call Decor8 AI API (synchronous — returns result directly)
+ *   7. Update job row with result
  *   Returns: { jobId: string }
  */
 
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     // ── 3. Parse form data ───────────────────────────────────
     const formData = await req.formData();
     const imageFile = formData.get('image') as File | null;
-    const roomType  = (formData.get('roomType') as RoomType) ?? 'living_room';
+    const roomType  = (formData.get('roomType') as RoomType) ?? 'livingroom';
     const style     = (formData.get('style') as RoomStyle) ?? 'modern';
     const reportId  = formData.get('reportId') as string | null;
 
@@ -126,29 +126,20 @@ export async function POST(req: NextRequest) {
 
     if (creditError) {
       console.error('Failed to deduct credit:', creditError);
-      // Don't fail the request — refund logic below handles this edge case
     }
 
-    // ── 7. Call REimagineHome API ────────────────────────────
-    // Fire and forget — client polls /api/staging/[jobId] for status
+    // ── 7. Call Decor8 AI API ────────────────────────────────
+    // Fire and forget — Decor8 is synchronous but may take 10-30s
+    // Client polls /api/staging/[jobId] for status updates
     (async () => {
       try {
-        const reimagineJobId = await createStagingJob(publicUrl, roomType, style);
-
-        await supabase
-          .from('staging_jobs')
-          .update({ reimagine_job_id: reimagineJobId, status: 'processing' })
-          .eq('id', job.id);
-
-        // Poll for result in background
-        const { pollStagingJob } = await import('@/lib/reimagine');
-        const result = await pollStagingJob(reimagineJobId);
+        const result = await createStagingJob(publicUrl, roomType, style);
 
         await supabase
           .from('staging_jobs')
           .update({
-            status:    result.status,
-            result_url: result.result_url ?? null,
+            status:        result.status,
+            result_url:    result.result_url ?? null,
             error_message: result.error ?? null,
           })
           .eq('id', job.id);
@@ -157,7 +148,7 @@ export async function POST(req: NextRequest) {
         if (result.status === 'failed') {
           await supabase
             .from('agent_subscriptions')
-            .update({ staging_credits: sub.staging_credits }) // restore
+            .update({ staging_credits: sub.staging_credits }) // restore original
             .eq('id', sub.id);
           console.log(`Staging job ${job.id} failed — credit refunded to ${user.email}`);
         }
