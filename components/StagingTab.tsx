@@ -71,7 +71,7 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
 
   const [credits, setCredits]         = useState(initialCredits);
   const [jobs, setJobs]               = useState<StagingJob[]>([]);
-  const [, setActiveJobId] = useState<string | null>(null);
+  // activeJobId removed — no longer needed with synchronous Decor8 API
   const [uploading, setUploading]     = useState(false);
   const [polling, setPolling]         = useState(false);
   const [imageFile, setImageFile]     = useState<File | null>(null);
@@ -81,17 +81,12 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
   const [error, setError]             = useState<string | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pollRef      = useRef<NodeJS.Timeout | null>(null);
 
   // Load existing jobs for this report
   useEffect(() => {
     loadJobs();
   }, [reportId]);
 
-  // Cleanup polling on unmount
-  useEffect(() => {
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, []);
 
   async function getAuthToken(): Promise<string | null> {
     const { data: { session } } = await supabase.auth.getSession();
