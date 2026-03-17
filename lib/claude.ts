@@ -160,7 +160,7 @@ async function callClaude(
 ): Promise<unknown | null> {
   const anthropic = getAnthropic();
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const message = await anthropic.messages.create({
         model: MODEL,
@@ -201,7 +201,8 @@ async function callClaude(
       const parsed = extractJSON(textBlock.text);
       if (parsed) return parsed;
 
-      console.error(`Claude attempt ${attempt + 1}: could not parse JSON`);
+      console.error(`Claude attempt ${attempt + 1}: could not parse JSON. First 300 chars:`, textBlock.text.substring(0, 300));
+      console.error(`Claude attempt ${attempt + 1}: last 200 chars:`, textBlock.text.substring(textBlock.text.length - 200));
     } catch (error) {
       console.error(`Claude attempt ${attempt + 1} error:`, error);
     }
@@ -215,25 +216,38 @@ async function callClaude(
 // ---------------------------------------------------------------------------
 
 function extractJSON(text: string): unknown | null {
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
+  // Strip markdown code fences if present
+  const cleaned = text.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '');
+
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
   if (start !== -1 && end !== -1 && end > start) {
-    const jsonStr = text.substring(start, end + 1);
+    let jsonStr = cleaned.substring(start, end + 1);
     try {
       return JSON.parse(jsonStr);
     } catch {
-      let cleaned = jsonStr.replace(/,\s*([}\]])/g, '$1');
+      // Remove trailing commas before } or ]
+      jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
       try {
-        return JSON.parse(cleaned);
+        return JSON.parse(jsonStr);
       } catch {
-        cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, (ch) =>
+        // Remove control characters (keep newlines/tabs)
+        jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, (ch) =>
           ch === '\n' || ch === '\r' || ch === '\t' ? ch : ''
         );
         try {
-          return JSON.parse(cleaned);
-        } catch (e) {
-          console.error('Failed to parse JSON:', (e as Error).message, jsonStr.substring(0, 300));
-          return null;
+          return JSON.parse(jsonStr);
+        } catch {
+          // Replace unescaped newlines inside string values
+          jsonStr = jsonStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) =>
+            match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+          );
+          try {
+            return JSON.parse(jsonStr);
+          } catch (e) {
+            console.error('Failed to parse JSON:', (e as Error).message, jsonStr.substring(0, 300));
+            return null;
+          }
         }
       }
     }
