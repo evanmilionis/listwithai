@@ -39,14 +39,14 @@ const MODEL = 'claude-sonnet-4-6';
 // Cuts wasteful reserved-but-unused tokens billed on every call.
 const MODULE_MAX_TOKENS = {
   timeline:       8192,
-  improvements:   6000,
-  pricing:        6000,
-  listingCopy:    4096,
-  legal:          8192,
-  socialMedia:    4096,
-  buyerCMA:       6000,
-  openHouse:      4096,
-  marketSnapshot: 4096,
+  improvements:   8192,
+  pricing:        8192,
+  listingCopy:    6000,
+  legal:          12000,
+  socialMedia:    6000,
+  buyerCMA:       8192,
+  openHouse:      6000,
+  marketSnapshot: 6000,
 } as const;
 
 // ---------------------------------------------------------------------------
