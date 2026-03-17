@@ -129,46 +129,55 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 7. Call Decor8 AI API ────────────────────────────────
-    // Fire and forget — Decor8 is synchronous but may take 10-30s
-    // Client polls /api/staging/[jobId] for status updates
-    (async () => {
-      try {
-        const result = await createStagingJob(publicUrl, roomType, style);
+    // Decor8 is synchronous (~10-30s) — await the result before responding.
+    // Vercel kills fire-and-forget background work after response is sent.
+    try {
+      const result = await createStagingJob(publicUrl, roomType, style);
 
-        await supabase
-          .from('staging_jobs')
-          .update({
-            status:        result.status,
-            result_url:    result.result_url ?? null,
-            error_message: result.error ?? null,
-          })
-          .eq('id', job.id);
+      await supabase
+        .from('staging_jobs')
+        .update({
+          status:        result.status,
+          result_url:    result.result_url ?? null,
+          error_message: result.error ?? null,
+        })
+        .eq('id', job.id);
 
-        // If failed — refund the credit
-        if (result.status === 'failed') {
-          await supabase
-            .from('agent_subscriptions')
-            .update({ staging_credits: sub.staging_credits }) // restore original
-            .eq('id', sub.id);
-          console.log(`Staging job ${job.id} failed — credit refunded to ${user.email}`);
-        }
-
-      } catch (err) {
-        console.error(`Background staging error for job ${job.id}:`, err);
-        await supabase
-          .from('staging_jobs')
-          .update({ status: 'failed', error_message: String(err) })
-          .eq('id', job.id);
-        // Refund credit on error
+      // If failed — refund the credit
+      if (result.status === 'failed') {
         await supabase
           .from('agent_subscriptions')
-          .update({ staging_credits: sub.staging_credits })
+          .update({ staging_credits: sub.staging_credits }) // restore original
           .eq('id', sub.id);
+        console.log(`Staging job ${job.id} failed — credit refunded to ${user.email}`);
       }
-    })();
 
-    // Return job ID immediately — client polls for result
-    return NextResponse.json({ jobId: job.id, creditsRemaining: sub.staging_credits - 1 });
+      return NextResponse.json({
+        jobId: job.id,
+        creditsRemaining: sub.staging_credits - 1,
+        status: result.status,
+        result_url: result.result_url,
+      });
+
+    } catch (err) {
+      console.error(`Staging API error for job ${job.id}:`, err);
+      await supabase
+        .from('staging_jobs')
+        .update({ status: 'failed', error_message: String(err) })
+        .eq('id', job.id);
+      // Refund credit on error
+      await supabase
+        .from('agent_subscriptions')
+        .update({ staging_credits: sub.staging_credits })
+        .eq('id', sub.id);
+
+      return NextResponse.json({
+        jobId: job.id,
+        creditsRemaining: sub.staging_credits,
+        status: 'failed',
+        error: 'Staging failed — credit refunded',
+      });
+    }
 
   } catch (error) {
     console.error('Staging create error:', error);

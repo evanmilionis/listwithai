@@ -138,7 +138,11 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
         body: formData,
       });
 
+      setPolling(true);
+
       const data = await res.json();
+
+      setPolling(false);
 
       if (!res.ok) {
         if (res.status === 402) setShowBuyModal(true);
@@ -147,34 +151,16 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
       }
 
       setCredits(data.creditsRemaining);
-      setActiveJobId(data.jobId);
-      setUploading(false);
-      setPolling(true);
       setImageFile(null);
       setImagePreview(null);
 
-      // Start polling
+      // Reload jobs from DB to show the result
       await loadJobs();
-      pollRef.current = setInterval(async () => {
-        const token = await getAuthToken();
-        if (!token) return;
 
-        const pollRes = await fetch(`/api/staging/${data.jobId}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        const job = await pollRes.json() as StagingJob;
-
-        // Update job in list
-        setJobs(prev => prev.map(j => j.id === job.id ? job : j));
-
-        if (job.status === 'complete' || job.status === 'failed') {
-          if (pollRef.current) clearInterval(pollRef.current);
-          setPolling(false);
-          setActiveJobId(null);
-          // Refund credit display if failed
-          if (job.status === 'failed') setCredits(c => c + 1);
-        }
-      }, 5000);
+      // If it failed, show the error
+      if (data.status === 'failed') {
+        setCredits(c => c + 1); // refund display
+      }
 
     } catch (err) {
       setError('Something went wrong. Please try again.');
@@ -363,12 +349,12 @@ export default function StagingTab({ reportId, stagingCredits: initialCredits }:
             transition: 'background 0.15s',
           }}
         >
-          {uploading ? 'Uploading...' : polling ? '⏳ Staging in progress (~60 sec)...' : `Stage This Room — 1 Credit ($20)`}
+          {uploading ? 'Uploading...' : polling ? '⏳ AI is staging your room (~20 sec)...' : `Stage This Room — 1 Credit ($20)`}
         </button>
 
         {polling && (
           <div style={{ textAlign: 'center', marginTop: 12, fontSize: 13, color: '#6b7280' }}>
-            Our AI is furnishing your room. This takes about 60 seconds. You can stay on this page or come back later.
+            Our AI is furnishing your room. This usually takes about 20 seconds. Please stay on this page.
           </div>
         )}
       </div>
