@@ -283,6 +283,16 @@ export interface ListingModule {
 export interface LegalModule {
   disclaimer: string;
   attorney_referral_note: string;
+  documents: {
+    document_name: string;
+    description: string;
+    template: string;
+    key_clauses_explained: {
+      clause: string;
+      plain_english: string;
+    }[];
+    what_to_fill_in: string[];
+  }[];
   florida_attorney_referral: {
     intro: string;
     what_to_ask_them: string[];

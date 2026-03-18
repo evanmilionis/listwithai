@@ -13,7 +13,8 @@ import type {
   OpenHouseModule,
   MarketSnapshotModule,
 } from '@/types';
-import { getConditionLabel } from '@/lib/utils';
+import { getConditionLabel, formatCurrency } from '@/lib/utils';
+import { buildLegalDocuments, type TemplateVars } from '@/lib/legalTemplates';
 
 // ---------------------------------------------------------------------------
 // Client (singleton — one instance for the entire report generation run)
@@ -32,19 +33,20 @@ function getAnthropic(): Anthropic {
   return _anthropic;
 }
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'claude-sonnet-4-6';
 
-// Per-module token ceilings — kept tight to speed up generation
+// Per-module token ceilings — sized to what each module actually needs.
+// Cuts wasteful reserved-but-unused tokens billed on every call.
 const MODULE_MAX_TOKENS = {
-  timeline:       2048,
-  improvements:   2048,
-  pricing:        2048,
-  listingCopy:    2048,
-  legal:          1500,
-  socialMedia:    2048,
-  buyerCMA:       2048,
-  openHouse:      2048,
-  marketSnapshot: 1500,
+  timeline:       8192,
+  improvements:   8192,
+  pricing:        8192,
+  listingCopy:    6000,
+  legal:          12000,
+  socialMedia:    6000,
+  buyerCMA:       8192,
+  openHouse:      6000,
+  marketSnapshot: 6000,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -150,10 +152,6 @@ export function buildPropertyContext(
 // Core callClaude — uses prompt caching on both system + property context
 // ---------------------------------------------------------------------------
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function callClaude(
   systemPrompt: string,
   propertyContext: PropertyContext,
@@ -162,9 +160,8 @@ async function callClaude(
 ): Promise<unknown | null> {
   const anthropic = getAnthropic();
 
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const start = Date.now();
       const message = await anthropic.messages.create({
         model: MODEL,
         max_tokens: maxTokens,
@@ -173,7 +170,7 @@ async function callClaude(
         system: [
           {
             type: 'text',
-            text: systemPrompt + '\n\nIMPORTANT: Return ONLY raw JSON. Do NOT wrap in markdown code blocks. Do NOT use ```json. Be MAXIMALLY CONCISE — keep every string value to 1 sentence. Arrays should have 3-5 items max unless the schema says otherwise. No filler, no fluff, no redundancy.',
+            text: systemPrompt + '\n\nIMPORTANT: Return ONLY raw JSON. Do NOT wrap in markdown code blocks. Do NOT use ```json. Start your response with { and end with }.',
             cache_control: { type: 'ephemeral' },
           },
         ],
@@ -195,51 +192,19 @@ async function callClaude(
               },
             ],
           },
-          // Prefill forces the model to continue from '{' — guarantees JSON output
-          {
-            role: 'assistant',
-            content: [{ type: 'text', text: '{' }],
-          },
         ],
       });
-
-      console.log(`Claude call succeeded in ${Date.now() - start}ms (attempt ${attempt + 1}, stop=${message.stop_reason}, tokens=${message.usage?.output_tokens})`);
 
       const textBlock = message.content.find((b) => b.type === 'text');
       if (!textBlock || textBlock.type !== 'text') return null;
 
-      // Prepend '{' because we prefilled the assistant response with it
-      const fullText = '{' + textBlock.text;
-
-      // Try normal parse first
-      const parsed = extractJSON(fullText);
+      const parsed = extractJSON(textBlock.text);
       if (parsed) return parsed;
 
-      // If truncated (hit max_tokens), try repairing the JSON
-      if (message.stop_reason === 'max_tokens') {
-        console.warn(`Claude response truncated at ${message.usage?.output_tokens} tokens — attempting JSON repair`);
-        const repaired = repairTruncatedJSON(fullText);
-        const repairedParsed = extractJSON(repaired);
-        if (repairedParsed) {
-          console.log('Truncated JSON repaired successfully');
-          return repairedParsed;
-        }
-        console.error('JSON repair failed');
-      }
-
-      console.error(`Claude attempt ${attempt + 1}: could not parse JSON. First 300 chars:`, fullText.substring(0, 300));
-      console.error(`Claude attempt ${attempt + 1}: last 200 chars:`, fullText.substring(fullText.length - 200));
-    } catch (error: unknown) {
-      const status = (error as { status?: number })?.status;
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`Claude attempt ${attempt + 1} error (status=${status}): ${msg}`);
-
-      // Exponential backoff on rate limit (429) or overload (529)
-      if ((status === 429 || status === 529) && attempt < 1) {
-        const delay = (attempt + 1) * 2000; // 2s, 4s
-        console.log(`Rate limited — waiting ${delay}ms before retry...`);
-        await sleep(delay);
-      }
+      console.error(`Claude attempt ${attempt + 1}: could not parse JSON. First 300 chars:`, textBlock.text.substring(0, 300));
+      console.error(`Claude attempt ${attempt + 1}: last 200 chars:`, textBlock.text.substring(textBlock.text.length - 200));
+    } catch (error) {
+      console.error(`Claude attempt ${attempt + 1} error:`, error);
     }
   }
 
@@ -247,59 +212,7 @@ async function callClaude(
 }
 
 // ---------------------------------------------------------------------------
-// Truncated JSON repair — closes open strings, arrays, and objects
-// ---------------------------------------------------------------------------
-
-function repairTruncatedJSON(text: string): string {
-  // Find the JSON start
-  const start = text.indexOf('{');
-  if (start === -1) return text;
-
-  let json = text.substring(start);
-
-  // If we're inside an unclosed string, close it
-  let inString = false;
-  let escaped = false;
-  for (let i = 0; i < json.length; i++) {
-    const ch = json[i];
-    if (escaped) { escaped = false; continue; }
-    if (ch === '\\') { escaped = true; continue; }
-    if (ch === '"') inString = !inString;
-  }
-  if (inString) json += '"';
-
-  // Remove any trailing partial key-value (e.g. `"key": "incomple`)
-  // by trimming back to the last complete value
-  json = json.replace(/,\s*"[^"]*"?\s*:?\s*"?[^"{}[\]]*$/, '');
-
-  // Count open braces/brackets and close them
-  let openBraces = 0;
-  let openBrackets = 0;
-  inString = false;
-  escaped = false;
-  for (let i = 0; i < json.length; i++) {
-    const ch = json[i];
-    if (escaped) { escaped = false; continue; }
-    if (ch === '\\') { escaped = true; continue; }
-    if (ch === '"') { inString = !inString; continue; }
-    if (inString) continue;
-    if (ch === '{') openBraces++;
-    if (ch === '}') openBraces--;
-    if (ch === '[') openBrackets++;
-    if (ch === ']') openBrackets--;
-  }
-
-  // Remove trailing comma before we close
-  json = json.replace(/,\s*$/, '');
-
-  for (let i = 0; i < openBrackets; i++) json += ']';
-  for (let i = 0; i < openBraces; i++) json += '}';
-
-  return json;
-}
-
-// ---------------------------------------------------------------------------
-// JSON extraction helper
+// JSON extraction helper (unchanged — already solid)
 // ---------------------------------------------------------------------------
 
 function extractJSON(text: string): unknown | null {
@@ -355,29 +268,29 @@ export async function generateTimeline(
   const system =
     'You are an expert Florida real estate consultant creating a personalized home selling timeline. Be specific, practical, and Florida-market aware. Format output as structured JSON.';
 
-  const prompt = `Using the property context above, create a FSBO selling timeline. Keep it tight: MAX 6 phases (not individual weeks), MAX 3 tasks per phase, 1 sentence per description.
+  const prompt = `Using the property context above, create a detailed week-by-week FSBO selling timeline.
 
 Return JSON with this exact structure:
 {
-  "timeline_summary": "1-2 sentence overview",
+  "timeline_summary": "string",
   "recommended_list_date": "YYYY-MM-DD",
   "recommended_list_day": "string",
   "estimated_close_date": "YYYY-MM-DD",
   "weeks": [
     {
       "week_number": 1,
-      "label": "Phase name (e.g. Weeks 1-2: Prep)",
+      "label": "string",
       "tasks": [
         {
-          "task": "short task name",
-          "description": "1 sentence",
+          "task": "string",
+          "description": "string",
           "priority": "high|medium|low",
           "estimated_hours": 0
         }
       ]
     }
   ],
-  "florida_specific_tips": ["string (max 3)"],
+  "florida_specific_tips": ["string"],
   "seasonal_note": "string"
 }`;
 
@@ -489,9 +402,9 @@ Return JSON with this exact structure:
 {
   "headline": "string",
   "tagline": "string",
-  "full_description": "string (150-200 words)",
-  "short_description": "string (40-60 words)",
-  "bullet_highlights": ["string (5-6 items)"],
+  "full_description": "string (250-350 words)",
+  "short_description": "string (50-75 words)",
+  "bullet_highlights": ["string (8-10 items)"],
   "open_house_description": "string",
   "seo_keywords": ["string"],
   "buyer_persona_targeted": "string",
@@ -502,33 +415,88 @@ Return JSON with this exact structure:
 }
 
 // ---------------------------------------------------------------------------
-// Module 5 — Legal / Attorney Referral
+// Module 5 — Legal Package
 //
-// No Claude call needed — returns static attorney referral guidance instantly.
-// Legal document templates have been removed to speed up generation.
+// Templates are pre-written in lib/legalTemplates.ts — variables are filled
+// at runtime. Claude only generates the plain-English clause explanations and
+// attorney referral advisory, which is a much smaller / faster call.
 // ---------------------------------------------------------------------------
 
 export async function generateLegalPackage(
   report: Report,
   ctx: PropertyContext
 ): Promise<LegalModule | null> {
+
+  // Step 1: Fill templates instantly — no Claude needed for the document text
+  const vars: TemplateVars = {
+    PROPERTY_ADDRESS: report.property_address,
+    PROPERTY_CITY:    report.property_city,
+    PROPERTY_STATE:   report.property_state ?? 'FL',
+    PROPERTY_ZIP:     report.property_zip,
+    SELLER_NAME:      report.customer_name,
+    ASKING_PRICE:     formatCurrency(report.asking_price),
+    TARGET_CLOSE_DATE: report.target_close_date ?? 'TBD',
+    CURRENT_DATE:     new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    COUNTY:           report.property_city, // best approximation without county field
+  };
+
+  const documents = buildLegalDocuments(vars);
+
+  // Step 2: Small Claude call — only for clause explanations + attorney advisory
+  // This replaces the massive "write entire contracts from scratch" call
+  const system =
+    'You are a Florida real estate paralegal. Explain legal concepts in plain English for FSBO sellers. Be concise and practical. Return only raw JSON.';
+
+  const prompt = `For a Florida FSBO home sale at ${vars.PROPERTY_ADDRESS}, provide:
+1. Plain-English explanations of the 5 most important clauses in a FL purchase agreement
+2. Attorney referral guidance
+
+Return JSON with this exact structure:
+{
+  "key_clauses_explained": [
+    { "clause": "string", "plain_english": "string" }
+  ],
+  "florida_attorney_referral": {
+    "intro": "string",
+    "what_to_ask_them": ["string"],
+    "typical_cost": "string",
+    "when_to_call": "string"
+  }
+}`;
+
+  const advisory = await callClaude(system, ctx, prompt, 1500) as {
+    key_clauses_explained: { clause: string; plain_english: string }[];
+    florida_attorney_referral: {
+      intro: string;
+      what_to_ask_them: string[];
+      typical_cost: string;
+      when_to_call: string;
+    };
+  } | null;
+
+  // Step 3: Attach clause explanations to the first document (Purchase Agreement)
+  const documentsWithExplanations = documents.map((doc, i) => ({
+    ...doc,
+    key_clauses_explained: i === 0 ? (advisory?.key_clauses_explained ?? []) : [],
+  }));
+
   return {
     disclaimer:
-      'This information is for general guidance only and does NOT constitute legal advice. Consult a licensed Florida real estate attorney before entering any binding agreement.',
+      'IMPORTANT: These are template documents for informational purposes only. They do NOT constitute legal advice and MUST be reviewed by a licensed Florida real estate attorney before use.',
     attorney_referral_note:
       'Florida law does not require an attorney for residential closings, but it is strongly recommended for FSBO sellers. A real estate attorney typically charges $400–$1,000 for contract review and closing oversight — a small cost relative to a transaction of this size.',
-    florida_attorney_referral: {
-      intro: 'Find a Florida Bar-certified real estate attorney in your county. Many offer free initial consultations for FSBO sellers.',
+    documents: documentsWithExplanations,
+    florida_attorney_referral: advisory?.florida_attorney_referral ?? {
+      intro: 'Find a Florida Bar-certified real estate attorney in your county.',
       what_to_ask_them: [
         'Do you handle FSBO closings?',
-        'What is your flat fee for contract review and closing oversight?',
+        'What is your flat fee for contract review?',
         'Can you act as closing agent?',
-        'Do you review purchase agreements before the seller signs?',
       ],
       typical_cost: '$400–$1,000 depending on complexity',
-      when_to_call: 'Before listing your property or accepting any offer',
+      when_to_call: 'Before accepting any offer',
     },
-  };
+  } as unknown as LegalModule;
 }
 
 // ---------------------------------------------------------------------------
@@ -548,13 +516,13 @@ export async function generateSocialMedia(
 
 Return JSON with this exact structure:
 {
-  "instagram_caption": "string (80-120 words with emojis)",
-  "instagram_hashtags": ["string (10 relevant hashtags)"],
-  "facebook_post": "string (60-80 words)",
-  "twitter_post": "string (under 280 characters)",
-  "linkedin_post": "string (60-80 words, professional)",
-  "short_form_video_script": "string (30 second script, brief shot directions)",
-  "email_blast": "string (80-120 words with clear CTA)"
+  "instagram_caption": "string (engaging, emoji-friendly, 150-200 words with line breaks)",
+  "instagram_hashtags": ["string (15-20 relevant hashtags)"],
+  "facebook_post": "string (conversational, 100-150 words, designed for engagement)",
+  "twitter_post": "string (under 280 characters, punchy)",
+  "linkedin_post": "string (professional tone, 100-150 words, targets investors/relocators)",
+  "short_form_video_script": "string (30-60 second script for Reels/TikTok with shot directions)",
+  "email_blast": "string (HTML-friendly email body, 150-200 words, with clear CTA)"
 }`;
 
   return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.socialMedia)) as SocialMediaModule | null;
@@ -577,7 +545,7 @@ export async function generateBuyerCMA(
 Return JSON with this exact structure:
 {
   "executive_summary": "string (2-3 sentences positioning the property and price)",
-  "property_highlights": ["string (5-6 key selling points)"],
+  "property_highlights": ["string (8-10 key selling points)"],
   "comparable_sales": [
     {
       "address": "string",
@@ -594,7 +562,7 @@ Return JSON with this exact structure:
   "market_position": "string (where this property sits in the market — above/below/at market value and why)",
   "value_justification": "string (3-4 sentences explaining why the price is fair/competitive)",
   "investment_outlook": "string (appreciation potential, rental potential, market trajectory)",
-  "neighborhood_highlights": ["string (3-5 neighborhood selling points)"],
+  "neighborhood_highlights": ["string (5-7 neighborhood selling points)"],
   "price_per_sqft_analysis": "string (how this property's $/sqft compares to area average)"
 }`;
 
@@ -619,9 +587,9 @@ export async function generateOpenHouse(
 Return JSON with this exact structure:
 {
   "property_fact_sheet": "string (formatted property overview suitable for a one-page handout — include address, beds, baths, sqft, year built, lot size, price, key features, HOA info if applicable)",
-  "feature_highlights": ["string (5-6 standout features)"],
+  "feature_highlights": ["string (10-12 standout features to emphasize during tours)"],
   "neighborhood_info": "string (paragraph about the neighborhood — schools, dining, shopping, lifestyle)",
-  "agent_talking_points": ["string (5-6 key talking points)"],
+  "agent_talking_points": ["string (8-10 key talking points for the agent during showings)"],
   "objection_handlers": [
     {
       "objection": "string (common buyer objection)",
@@ -659,7 +627,7 @@ Return JSON with this exact structure:
   "buyer_vs_seller_market": "string (which type and why)",
   "price_trend_narrative": "string (how prices have moved recently and where they're heading)",
   "best_time_to_list": "string (seasonal advice for this specific Florida market)",
-  "key_insights": ["string (3-5 actionable market insights)"],
+  "key_insights": ["string (5-7 actionable market insights)"],
   "comparable_recent_sales": [
     {
       "address": "string",
