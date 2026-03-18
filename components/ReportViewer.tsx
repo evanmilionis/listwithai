@@ -659,11 +659,6 @@ function LegalPackage({ report }: { report: Report }) {
     <div className="space-y-6">
       <Disclaimer variant="banner" />
 
-      {/* Documents */}
-      {legal.documents.map((doc, i) => (
-        <ExpandableDocument key={i} doc={doc} />
-      ))}
-
       {/* Florida attorney referral */}
       {legal.florida_attorney_referral && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-6">
@@ -704,84 +699,6 @@ function LegalPackage({ report }: { report: Report }) {
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ExpandableDocument({
-  doc,
-}: {
-  doc: NonNullable<Report['report_output']>['legal'] extends { documents: (infer D)[] } | null ? D : never;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-slate-400" />
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">{doc.document_name}</h4>
-            <p className="text-xs text-slate-500 mt-0.5">{doc.description}</p>
-          </div>
-        </div>
-        {open ? (
-          <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0" />
-        )}
-      </button>
-
-      {open && (
-        <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
-          {/* Template text */}
-          <div>
-            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Template
-            </h5>
-            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-line font-mono text-xs">
-              {doc.template}
-            </div>
-          </div>
-
-          {/* Key clauses */}
-          {doc.key_clauses_explained.length > 0 && (
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Key Clauses Explained
-              </h5>
-              <div className="space-y-2">
-                {doc.key_clauses_explained.map((kc, i) => (
-                  <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                    <p className="text-xs font-semibold text-slate-900">{kc.clause}</p>
-                    <p className="text-xs text-slate-600 mt-1">{kc.plain_english}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Fields to fill */}
-          {doc.what_to_fill_in.length > 0 && (
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Fields to Fill In
-              </h5>
-              <ul className="space-y-1.5">
-                {doc.what_to_fill_in.map((field, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <ChevronRight className="h-3 w-3 text-slate-400 mt-0.5 flex-shrink-0" />
-                    {field}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -1040,22 +957,22 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       html += `</p>`;
     }
 
-    // Legal
+    // Legal / Attorney Referral
     if (output?.legal) {
       const legal = output.legal;
-      html += `<h2 class="page-break">Legal Package</h2>`;
+      html += `<h2 class="page-break">Attorney Referral</h2>`;
       html += `<div class="disclaimer">${legal.disclaimer}</div>`;
-      legal.documents.forEach(doc => {
-        html += `<div class="card"><h3>${doc.document_name}</h3><p><em>${doc.description}</em></p>`;
-        html += `<pre style="white-space:pre-wrap;font-size:12px;background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin:8px 0;">${doc.template}</pre>`;
-        if (doc.key_clauses_explained.length > 0) {
-          html += `<h3>Key Clauses</h3>`;
-          doc.key_clauses_explained.forEach(kc => {
-            html += `<p><strong>${kc.clause}:</strong> ${kc.plain_english}</p>`;
-          });
-        }
+      if (legal.florida_attorney_referral) {
+        html += `<div class="card"><p>${legal.florida_attorney_referral.intro}</p>`;
+        html += `<h3>What to Ask</h3><ul>`;
+        legal.florida_attorney_referral.what_to_ask_them.forEach(q => {
+          html += `<li>${q}</li>`;
+        });
+        html += `</ul>`;
+        html += `<p><strong>Typical Cost:</strong> ${legal.florida_attorney_referral.typical_cost}</p>`;
+        html += `<p><strong>When to Call:</strong> ${legal.florida_attorney_referral.when_to_call}</p>`;
         html += `</div>`;
-      });
+      }
     }
 
     // Footer

@@ -3,7 +3,7 @@ export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import { generateReport } from '@/lib/reportGenerator';
+
 import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -118,8 +118,18 @@ export async function POST(request: NextRequest) {
             console.error('Failed to update report status:', updateError);
           }
 
-          // Await generation — Vercel kills the function after response is sent
-          await generateReport(reportId);
+          // Fire off generation in a separate serverless invocation.
+          // AbortController prevents this function from waiting for the 300s response.
+          const generateUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/report/generate`;
+          const genController = new AbortController();
+          fetch(generateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reportId }),
+            signal: genController.signal,
+          }).catch(() => {});
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          genController.abort();
         }
 
         if (session.mode === 'subscription') {

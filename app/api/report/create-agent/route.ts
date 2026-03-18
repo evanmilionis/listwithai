@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
-import { generateReport } from '@/lib/reportGenerator';
 
-export const maxDuration = 300;
+export const maxDuration = 30;
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,7 +58,6 @@ export async function POST(request: NextRequest) {
         target_close_date: formData.target_close_date,
         customer_type: 'agent',
         status: 'pending',
-        stripe_session_id: '',
         sold_status: 'unknown',
         followup_stage: 0,
         report_output: {
@@ -92,8 +90,23 @@ export async function POST(request: NextRequest) {
 
     console.log(`Agent report created: ${report.id} for user ${userId}`);
 
-    // Await generation — Vercel kills serverless functions after response
-    await generateReport(report.id);
+    // Fire off generation in a separate serverless invocation.
+    // Use AbortController so this function doesn't wait for the 300s generate
+    // response — Vercel keeps functions alive while any fetch promise is pending.
+    const generateUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/report/generate`;
+    const controller = new AbortController();
+    fetch(generateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportId: report.id }),
+      signal: controller.signal,
+    }).catch(() => {
+      // Expected: AbortError after the request is dispatched
+    });
+    // Give the request 1s to reach Vercel's edge, then abort so this
+    // function can exit. The generate route runs as its own invocation.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    controller.abort();
 
     return NextResponse.json({
       success: true,

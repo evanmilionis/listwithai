@@ -14,7 +14,21 @@ import {
   generateMarketSnapshot,
 } from '@/lib/claude';
 import { sendReportReadyEmail } from '@/lib/resend';
-import type { Report, ReportOutput, RentcastData, NearbyAmenities } from '@/types';
+import type {
+  Report,
+  ReportOutput,
+  RentcastData,
+  NearbyAmenities,
+  TimelineModule,
+  ImprovementsModule,
+  PricingModule,
+  ListingModule,
+  LegalModule,
+  SocialMediaModule,
+  BuyerCMAModule,
+  OpenHouseModule,
+  MarketSnapshotModule,
+} from '@/types';
 
 /**
  * Main report generation orchestrator.
@@ -111,11 +125,18 @@ export async function generateReport(reportId: string): Promise<void> {
     console.log(`Property context built — ${ctx.text.length} chars (~${Math.round(ctx.text.length / 4)} tokens)`);
 
     // -----------------------------------------------------------------------
-    // 4. Run Claude modules IN PARALLEL
-    //    All 5 modules run concurrently to fit within Vercel's 60s timeout
+    // 4. Run Claude modules in TWO batches to avoid rate limits
+    //    Batch 1: 5 base modules (all reports)
+    //    Batch 2: 4 agent-only modules (agent reports only)
+    //    Each batch runs in parallel; batches run sequentially.
     // -----------------------------------------------------------------------
-    console.log('Starting all 5 Claude modules in parallel...');
-    const [timeline, improvements, pricing, listing, legal] = await Promise.all([
+    const isAgent = typedReport.customer_type === 'agent';
+    const moduleCount = isAgent ? 9 : 5;
+    console.log(`Starting ${moduleCount} Claude modules (${isAgent ? '2 batches' : '1 batch'})...`);
+
+    // Batch 1: base 5 modules
+    const batch1Start = Date.now();
+    const batch1 = await Promise.all([
       generateTimeline(typedReport, rentcastData, ctx).catch((err) => {
         console.error('Timeline failed:', err);
         return null;
@@ -137,24 +158,13 @@ export async function generateReport(reportId: string): Promise<void> {
         return null;
       }),
     ]);
-    console.log('  Timeline:', timeline ? 'OK' : 'FAILED');
-    console.log('  Improvements:', improvements ? 'OK' : 'FAILED');
-    console.log('  Pricing:', pricing ? 'OK' : 'FAILED');
-    console.log('  Listing:', listing ? 'OK' : 'FAILED');
-    console.log('  Legal:', legal ? 'OK' : 'FAILED');
+    console.log(`Batch 1 done in ${Date.now() - batch1Start}ms`);
 
-    // -----------------------------------------------------------------------
-    // 4b. Run AGENT-ONLY modules (social media, buyer CMA, open house, market snapshot)
-    //     Only generated for agent customer_type reports
-    // -----------------------------------------------------------------------
-    let socialMedia = null;
-    let buyerCMA = null;
-    let openHouse = null;
-    let marketSnapshot = null;
-
-    if (typedReport.customer_type === 'agent') {
-      console.log('Starting agent-only modules...');
-      [socialMedia, buyerCMA, openHouse, marketSnapshot] = await Promise.all([
+    // Batch 2: agent-only 4 modules
+    let batch2: (SocialMediaModule | BuyerCMAModule | OpenHouseModule | MarketSnapshotModule | null)[] = [];
+    if (isAgent) {
+      const batch2Start = Date.now();
+      batch2 = await Promise.all([
         generateSocialMedia(typedReport, rentcastData, amenities, ctx).catch((err) => {
           console.error('Social Media failed:', err);
           return null;
@@ -172,6 +182,25 @@ export async function generateReport(reportId: string): Promise<void> {
           return null;
         }),
       ]);
+      console.log(`Batch 2 done in ${Date.now() - batch2Start}ms`);
+    }
+
+    const timeline = batch1[0] as TimelineModule | null;
+    const improvements = batch1[1] as ImprovementsModule | null;
+    const pricing = batch1[2] as PricingModule | null;
+    const listing = batch1[3] as ListingModule | null;
+    const legal = batch1[4] as LegalModule | null;
+    const socialMedia = isAgent ? batch2[0] as SocialMediaModule | null : null;
+    const buyerCMA = isAgent ? batch2[1] as BuyerCMAModule | null : null;
+    const openHouse = isAgent ? batch2[2] as OpenHouseModule | null : null;
+    const marketSnapshot = isAgent ? batch2[3] as MarketSnapshotModule | null : null;
+
+    console.log('  Timeline:', timeline ? 'OK' : 'FAILED');
+    console.log('  Improvements:', improvements ? 'OK' : 'FAILED');
+    console.log('  Pricing:', pricing ? 'OK' : 'FAILED');
+    console.log('  Listing:', listing ? 'OK' : 'FAILED');
+    console.log('  Legal:', legal ? 'OK' : 'FAILED');
+    if (isAgent) {
       console.log('  Social Media:', socialMedia ? 'OK' : 'FAILED');
       console.log('  Buyer CMA:', buyerCMA ? 'OK' : 'FAILED');
       console.log('  Open House:', openHouse ? 'OK' : 'FAILED');
