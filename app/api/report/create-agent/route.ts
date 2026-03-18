@@ -59,7 +59,6 @@ export async function POST(request: NextRequest) {
         target_close_date: formData.target_close_date,
         customer_type: 'agent',
         status: 'pending',
-        stripe_session_id: '',
         sold_status: 'unknown',
         followup_stage: 0,
         report_output: {
