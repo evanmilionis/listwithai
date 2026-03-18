@@ -509,8 +509,8 @@ Return JSON with this exact structure:
 // ---------------------------------------------------------------------------
 
 export async function generateLegalPackage(
-  _report: Report,
-  _ctx: PropertyContext
+  report: Report,
+  ctx: PropertyContext
 ): Promise<LegalModule | null> {
   return {
     disclaimer:
