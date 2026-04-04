@@ -36,8 +36,8 @@ export default function RefundPolicyPage() {
             <p>
               You may cancel your ListAI subscription at any time through your dashboard or by
               emailing{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>. Cancellation takes effect at the end of your current billing period. You will
               retain access to your dashboard and generated reports until the period ends.
             </p>
@@ -68,8 +68,8 @@ export default function RefundPolicyPage() {
               If your report failed to generate due to a technical error on our end (e.g., never arrived,
               incomplete, or corrupted), we will either regenerate it at no additional charge or issue a
               full refund at our discretion. Contact us within 7 days of your purchase at{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>{' '}
               with your order details.
             </p>
@@ -88,8 +88,8 @@ export default function RefundPolicyPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">Contact</h2>
             <p>
               For refund requests or billing questions:{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>
             </p>
           </section>

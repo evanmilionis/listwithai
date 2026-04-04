@@ -27,8 +27,8 @@ export default function PrivacyPage() {
               ListAI (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website{' '}
               <strong>listwithai.io</strong> and provides AI-powered home selling tools for
               homeowners and real estate agents. Our contact email is{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>.
             </p>
           </section>
@@ -112,8 +112,8 @@ export default function PrivacyPage() {
             </ul>
             <p className="mt-2">
               To exercise any of these rights, email us at{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>.
             </p>
           </section>
@@ -148,8 +148,8 @@ export default function PrivacyPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">11. Contact Us</h2>
             <p>
               If you have any questions about this Privacy Policy, please contact us at:{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>
             </p>
           </section>

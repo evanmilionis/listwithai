@@ -7,7 +7,7 @@ interface ExitIntentPopupProps {
   email?: string;
 }
 
-const CALENDLY_URL = 'https://calendly.com/listwithai/consultation';
+const CALENDLY_URL = 'https://calendly.com/partnerships-bizzyu/listai-intro-call';
 const SESSION_KEY = 'listai_exit_popup_shown';
 
 export default function ExitIntentPopup({ email: initialEmail }: ExitIntentPopupProps) {

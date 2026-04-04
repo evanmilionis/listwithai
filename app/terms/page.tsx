@@ -158,7 +158,7 @@ export default function TermsPage() {
               actions that qualify under applicable rules are also exempt from this arbitration requirement.
             </p>
             <p className="mt-3">
-              To initiate arbitration, you must send written notice to <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">hello@listwithai.io</a>.
+              To initiate arbitration, you must send written notice to <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">evangelos@univentureprop.com</a>.
             </p>
           </section>
 
@@ -184,8 +184,8 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">14. Contact</h2>
             <p>
               Questions about these Terms? Contact us at{' '}
-              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
-                hello@listwithai.io
+              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
+                evangelos@univentureprop.com
               </a>
             </p>
           </section>
