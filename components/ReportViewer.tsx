@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, getConditionLabel } from '@/lib/utils';
-import type { Report, SocialMediaModule, BuyerCMAModule, OpenHouseModule, MarketSnapshotModule } from '@/types';
+import type { Report, SocialMediaModule, BuyerCMAModule, OpenHouseModule, MarketSnapshotModule, PricingModule, TimelineModule, ImprovementsModule, LegalModule } from '@/types';
 import Disclaimer from '@/components/Disclaimer';
 import MLSReferral from '@/components/MLSReferral';
 import AttorneyCards from '@/components/AttorneyCards';
@@ -853,6 +853,96 @@ function EmptyTab({ message }: { message: string }) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Next Steps Panel                                                   */
+/* ------------------------------------------------------------------ */
+function NextStepsPanel({ report }: { report: Report }) {
+  const output = report.report_output;
+  const pricing = output?.pricing as PricingModule | null | undefined;
+  const timeline = output?.timeline as TimelineModule | null | undefined;
+  const improvements = output?.improvements as ImprovementsModule | null | undefined;
+  const legal = output?.legal as LegalModule | null | undefined;
+
+  const steps: { label: string; detail: string }[] = [];
+
+  // 1. Recommended list price
+  if (pricing?.recommended_list_price) {
+    steps.push({
+      label: `List your home at $${pricing.recommended_list_price.toLocaleString()}`,
+      detail: pricing.pricing_strategy
+        ? pricing.pricing_strategy.split('.')[0] + '.'
+        : `Based on comparable sales in ${report.property_city}.`,
+    });
+  }
+
+  // 2. Target list date
+  if (timeline?.recommended_list_date) {
+    steps.push({
+      label: `Target list date: ${timeline.recommended_list_date}`,
+      detail: timeline.timeline_summary
+        ? timeline.timeline_summary.split('.')[0] + '.'
+        : 'See your full timeline for week-by-week tasks.',
+    });
+  }
+
+  // 3. Top improvement
+  const topImprovement = improvements?.recommendations?.[0];
+  if (topImprovement) {
+    steps.push({
+      label: `${topImprovement.area}: ${topImprovement.recommendation}`,
+      detail: `Est. cost ${topImprovement.estimated_cost} · Est. ROI ${topImprovement.estimated_roi}`,
+    });
+  }
+
+  // 4. First required document
+  const firstDoc = legal?.required_documents?.[0];
+  if (firstDoc) {
+    steps.push({
+      label: `Gather: ${firstDoc.document_name}`,
+      detail: firstDoc.description,
+    });
+  }
+
+  // 5. Hire an attorney
+  steps.push({
+    label: 'Hire a real estate attorney before signing anything',
+    detail: 'Check the Attorneys tab for options near you. Have them review all contracts.',
+  });
+
+  // 6. Use the listing copy
+  if (output?.listing) {
+    steps.push({
+      label: 'Copy your AI-written listing headline & description',
+      detail: 'Find it in the Listing Copy tab. Use it on Zillow, Realtor.com, and any other platform.',
+    });
+  }
+
+  if (steps.length === 0) return null;
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
+      <div className="flex items-center gap-2 mb-4">
+        <CheckCircle className="h-5 w-5 text-blue-600 shrink-0" />
+        <h2 className="text-base font-semibold text-blue-900">Your Next Steps</h2>
+        <span className="ml-auto text-xs text-blue-500 font-medium">{steps.length} action items</span>
+      </div>
+      <ol className="space-y-3">
+        {steps.map((step, i) => (
+          <li key={i} className="flex gap-3">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white mt-0.5">
+              {i + 1}
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-slate-900">{step.label}</p>
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 export default function ReportViewer({ report, agentMode = false, stagingCredits = 0 }: ReportViewerProps) {
@@ -1169,6 +1259,9 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
           </div>
         </div>
       </div>
+
+      {/* Next Steps panel — only show when report is complete */}
+      {report.status === 'complete' && <NextStepsPanel report={report} />}
 
       {/* Tab navigation */}
       <div className="border-b border-slate-200 -mx-1 overflow-x-auto">
