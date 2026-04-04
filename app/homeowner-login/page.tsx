@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase';
 import { Mail, ArrowRight, CheckCircle } from 'lucide-react';
 
 export default function HomeownerLoginPage() {
@@ -18,15 +17,19 @@ export default function HomeownerLoginPage() {
     setError('');
 
     try {
-      const supabase = createClient();
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback/homeowner`,
-        },
+      const res = await fetch('/api/homeowner/send-access-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
       });
 
-      if (otpError) throw otpError;
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Something went wrong. Please try again.');
+        return;
+      }
+
       setSent(true);
     } catch {
       setError('Something went wrong. Please try again or contact support.');

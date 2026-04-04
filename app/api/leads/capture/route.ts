@@ -82,6 +82,11 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Send nurture email even for returning exit-intent leads
+        if (leadData.email && body.source === 'exit_intent') {
+          sendLeadNurtureEmail(leadData.email as string).catch(() => {});
+        }
+
         return NextResponse.json({ id: data.id });
       }
     }

@@ -44,16 +44,31 @@ export default function HomeownerDashboardPage() {
         .limit(1)
         .single<Report>();
 
-      // Fallback: find report via homeowner_subscriptions.report_id
+      // Fallback: find report via homeowner_subscriptions.report_id (by user_id or email)
       if (!foundReport) {
+        const userEmail = session.user.email;
+
         const { data: sub } = await supabase
           .from('homeowner_subscriptions')
-          .select('report_id')
-          .eq('user_id', userId)
-          .eq('status', 'active')
+          .select('id, report_id')
+          .or(
+            `user_id.eq.${userId}${userEmail ? `,email.eq.${userEmail}` : ''}`
+          )
+          .in('status', ['active', 'trialing'])
+          .order('created_at', { ascending: false })
+          .limit(1)
           .single();
 
         if (sub?.report_id) {
+          // Link user_id if it isn't set yet
+          if (userId) {
+            await supabase
+              .from('homeowner_subscriptions')
+              .update({ user_id: userId })
+              .eq('id', sub.id)
+              .is('user_id', null);
+          }
+
           const { data: linkedReport } = await supabase
             .from('reports')
             .select('*')
