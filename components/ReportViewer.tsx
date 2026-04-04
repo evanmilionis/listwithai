@@ -910,11 +910,13 @@ function NextStepsPanel({ report }: { report: Report }) {
     detail: 'Use a flat-fee MLS service like Houzeo or ListWithFreedom. They put your home on Zillow, Realtor.com, and your local MLS. See the MLS tab.',
   });
 
-  // 5. Hire an attorney
-  steps.push({
-    label: 'Hire a real estate attorney before signing anything',
-    detail: 'Have them review all contracts and disclosures. See the Attorneys tab for options near you.',
-  });
+  // 5. Use listing copy + virtual staging for photos
+  if (output?.listing) {
+    steps.push({
+      label: 'Copy your AI-written listing & stage your photos',
+      detail: 'Get your headline and description from the Listing Copy tab. Then use the Virtual Staging tab to generate AI-enhanced photos for your listing — no photographer needed.',
+    });
+  }
 
   // 6. First required document
   const firstDoc = legal?.required_documents?.[0];
@@ -925,13 +927,11 @@ function NextStepsPanel({ report }: { report: Report }) {
     });
   }
 
-  // 7. Use the listing copy
-  if (output?.listing) {
-    steps.push({
-      label: 'Copy your AI-written listing headline & description',
-      detail: 'Find it in the Listing Copy tab. Paste it into Zillow, Realtor.com, Houzeo, or any platform.',
-    });
-  }
+  // 7. Hire an attorney — always last
+  steps.push({
+    label: 'Hire a real estate attorney before signing anything',
+    detail: 'Have them review all contracts and disclosures. See the Attorneys tab for options near you.',
+  });
 
   if (steps.length === 0) return null;
 

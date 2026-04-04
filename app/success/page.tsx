@@ -1,58 +1,14 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
-import { createClient } from '@/lib/supabase';
-import { CheckCircle, Mail, Clock, FileText, Send } from 'lucide-react';
+import { CheckCircle, Mail, Clock, FileText, LayoutDashboard } from 'lucide-react';
 
 function SuccessContent() {
   const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
   const type = searchParams.get('type') || 'homeowner';
-  const prefillEmail = searchParams.get('email') || '';
-  const [email, setEmail] = useState<string | null>(null);
-  const [agentEmail, setAgentEmail] = useState(prefillEmail);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
-  const [magicLinkError, setMagicLinkError] = useState('');
-
-  useEffect(() => {
-    // Optionally fetch session details to show email
-    if (sessionId) {
-      setEmail(null); // Will be populated by webhook
-    }
-  }, [sessionId]);
-
-  async function handleSendMagicLink(e: React.FormEvent) {
-    e.preventDefault();
-    if (!agentEmail) return;
-
-    setMagicLinkLoading(true);
-    setMagicLinkError('');
-
-    try {
-      const supabase = createClient();
-      const callbackPath = type === 'agent' ? '/auth/callback' : '/auth/callback/homeowner';
-      const { error } = await supabase.auth.signInWithOtp({
-        email: agentEmail,
-        options: {
-          emailRedirectTo: `${window.location.origin}${callbackPath}`,
-        },
-      });
-
-      if (error) {
-        setMagicLinkError(error.message);
-      } else {
-        setMagicLinkSent(true);
-      }
-    } catch {
-      setMagicLinkError('Something went wrong. Please try again.');
-    } finally {
-      setMagicLinkLoading(false);
-    }
-  }
 
   if (type === 'agent') {
     return (
@@ -67,83 +23,36 @@ function SuccessContent() {
               Welcome to ListAI Agent!
             </h1>
             <p className="mt-4 text-slate-600">
-              Your subscription is active! Create your account to access the
-              dashboard.
+              Your subscription is active. Check your email — we sent you a sign-in link to access your dashboard.
             </p>
 
-            {/* Magic link sign-up form */}
-            <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6 text-left">
-              {magicLinkSent ? (
-                <div className="text-center">
-                  <Mail className="text-blue-600 mx-auto mb-3" size={32} />
-                  <h3 className="font-semibold text-navy-800 mb-2">
-                    Check your email!
-                  </h3>
-                  <p className="text-sm text-slate-600">
-                    We sent a magic link to{' '}
-                    <span className="font-medium">{agentEmail}</span>. Click the
-                    link to sign in and access your dashboard.
-                  </p>
-                  <button
-                    onClick={() => setMagicLinkSent(false)}
-                    className="mt-4 text-sm text-blue-600 hover:text-blue-700 underline"
-                  >
-                    Use a different email
-                  </button>
+            <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6 text-left space-y-4">
+              <div className="flex gap-3">
+                <Mail className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                <div>
+                  <p className="text-sm font-medium text-navy-800">Check your email</p>
+                  <p className="text-xs text-slate-500">We sent a sign-in link to the email you used at checkout.</p>
                 </div>
-              ) : (
-                <>
-                  <h3 className="font-semibold text-navy-800 mb-2">
-                    Create your account
-                  </h3>
-                  <p className="text-sm text-slate-500 mb-4">
-                    Enter the email you used for payment. We&apos;ll send a
-                    magic link to set up your account.
-                  </p>
-                  <form onSubmit={handleSendMagicLink} className="space-y-3">
-                    <input
-                      type="email"
-                      value={agentEmail}
-                      onChange={(e) => setAgentEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      className="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    {magicLinkError && (
-                      <p className="text-sm text-red-600">{magicLinkError}</p>
-                    )}
-                    <button
-                      type="submit"
-                      disabled={magicLinkLoading || !agentEmail}
-                      className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-navy-800 text-white font-semibold rounded-lg hover:bg-navy-900 transition-colors disabled:opacity-50 text-sm"
-                    >
-                      {magicLinkLoading ? (
-                        'Sending...'
-                      ) : (
-                        <>
-                          <Send size={16} />
-                          Send Magic Link
-                        </>
-                      )}
-                    </button>
-                  </form>
-                </>
-              )}
+              </div>
+              <div className="flex gap-3">
+                <LayoutDashboard className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                <div>
+                  <p className="text-sm font-medium text-navy-800">Access your dashboard</p>
+                  <p className="text-xs text-slate-500">Click the link in your email to sign in and start creating reports.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <FileText className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
+                <div>
+                  <p className="text-sm font-medium text-navy-800">9-module agent report</p>
+                  <p className="text-xs text-slate-500">Pricing, timeline, listing copy, legal, social media, buyer CMA, open house kit, market snapshot, and virtual staging.</p>
+                </div>
+              </div>
             </div>
 
-            <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6 text-left">
-              <h3 className="font-semibold text-navy-800 mb-4">Next steps:</h3>
-              <ul className="space-y-3">
-                <li className="flex gap-3 text-sm text-slate-600">
-                  <Mail className="text-blue-600 flex-shrink-0" size={18} />
-                  Click the magic link in your email to sign in
-                </li>
-                <li className="flex gap-3 text-sm text-slate-600">
-                  <FileText className="text-blue-600 flex-shrink-0" size={18} />
-                  Create your first report from the dashboard
-                </li>
-              </ul>
-            </div>
+            <p className="mt-6 text-xs text-slate-500">
+              Questions? Contact us at hello@listwithai.io
+            </p>
           </div>
         </main>
         <Footer />
@@ -160,110 +69,32 @@ function SuccessContent() {
             <CheckCircle className="text-green-600" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-navy-800">
-            Subscription Active!
+            You&apos;re all set!
           </h1>
           <p className="mt-4 text-slate-600">
-            Your $100/mo subscription is confirmed. We&apos;re generating your
-            AI-powered selling report now.
+            Your $100/mo subscription is confirmed. Your AI-powered selling report is being generated now.
           </p>
 
-          {/* Magic link sign-up form */}
-          <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6 text-left">
-            {magicLinkSent ? (
-              <div className="text-center">
-                <Mail className="text-blue-600 mx-auto mb-3" size={32} />
-                <h3 className="font-semibold text-navy-800 mb-2">
-                  Check your email!
-                </h3>
-                <p className="text-sm text-slate-600">
-                  We sent a magic link to{' '}
-                  <span className="font-medium">{agentEmail}</span>. Click the
-                  link to sign in and access your dashboard.
-                </p>
-                <button
-                  onClick={() => setMagicLinkSent(false)}
-                  className="mt-4 text-sm text-blue-600 hover:text-blue-700 underline"
-                >
-                  Use a different email
-                </button>
-              </div>
-            ) : (
-              <>
-                <h3 className="font-semibold text-navy-800 mb-2">
-                  Create your account
-                </h3>
-                <p className="text-sm text-slate-500 mb-4">
-                  Enter the email you used for payment. We&apos;ll send a
-                  magic link to set up your account.
-                </p>
-                <form onSubmit={handleSendMagicLink} className="space-y-3">
-                  <input
-                    type="email"
-                    value={agentEmail}
-                    onChange={(e) => setAgentEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  {magicLinkError && (
-                    <p className="text-sm text-red-600">{magicLinkError}</p>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={magicLinkLoading || !agentEmail}
-                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-navy-800 text-white font-semibold rounded-lg hover:bg-navy-900 transition-colors disabled:opacity-50 text-sm"
-                  >
-                    {magicLinkLoading ? (
-                      'Sending...'
-                    ) : (
-                      <>
-                        <Send size={16} />
-                        Send Magic Link
-                      </>
-                    )}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-
-          <div className="mt-6 bg-white rounded-xl border border-slate-200 p-6 text-left space-y-4">
+          <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6 text-left space-y-4">
             <div className="flex gap-3">
               <Clock className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
               <div>
-                <p className="text-sm font-medium text-navy-800">
-                  Report generating...
-                </p>
-                <p className="text-xs text-slate-500">
-                  This typically takes 2-5 minutes
-                </p>
+                <p className="text-sm font-medium text-navy-800">Report generating now</p>
+                <p className="text-xs text-slate-500">Takes about 2–3 minutes. We&apos;ll email you the moment it&apos;s ready.</p>
               </div>
             </div>
             <div className="flex gap-3">
               <Mail className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
               <div>
-                <p className="text-sm font-medium text-navy-800">
-                  Email delivery
-                </p>
-                <p className="text-xs text-slate-500">
-                  {email
-                    ? `We'll send your report link to ${email}`
-                    : "We'll email your report link when it's ready"}
-                </p>
+                <p className="text-sm font-medium text-navy-800">Email delivery</p>
+                <p className="text-xs text-slate-500">Your report link will be sent to the email you used at checkout. Check your spam folder if you don&apos;t see it.</p>
               </div>
             </div>
             <div className="flex gap-3">
-              <FileText
-                className="text-blue-600 flex-shrink-0 mt-0.5"
-                size={18}
-              />
+              <FileText className="text-blue-600 flex-shrink-0 mt-0.5" size={18} />
               <div>
-                <p className="text-sm font-medium text-navy-800">
-                  Your subscription is active
-                </p>
-                <p className="text-xs text-slate-500">
-                  5-module report: timeline, pricing, listing copy, improvements, legal templates
-                </p>
+                <p className="text-sm font-medium text-navy-800">What&apos;s in your report</p>
+                <p className="text-xs text-slate-500">Pricing strategy, selling timeline, listing copy, improvement recommendations, legal guidance, and more.</p>
               </div>
             </div>
           </div>
