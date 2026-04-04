@@ -12,7 +12,6 @@ import {
   Copy,
   Download,
   Share2,
-  ChevronDown,
   ChevronRight,
   Calendar,
   DollarSign,
