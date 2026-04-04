@@ -102,6 +102,12 @@ function SuccessContent() {
           <p className="mt-6 text-xs text-slate-500">
             Questions? Contact us at evangelos@univentureprop.com
           </p>
+          <p className="mt-3 text-xs text-slate-400">
+            Lost the link later?{' '}
+            <Link href="/homeowner-login" className="text-blue-600 hover:underline">
+              Access your report here
+            </Link>
+          </p>
         </div>
       </main>
       <Footer />

@@ -952,7 +952,7 @@ function OfferReviewTab({ report }: { report: Report }) {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Offer Price *</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">How much are they offering? *</label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                 <input
@@ -966,7 +966,10 @@ function OfferReviewTab({ report }: { report: Report }) {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Earnest Money</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Good faith deposit
+                <span className="ml-1 text-slate-400 font-normal">(the upfront money they put down now)</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                 <input
@@ -979,33 +982,28 @@ function OfferReviewTab({ report }: { report: Report }) {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Down Payment %</label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={form.downPayment}
-                onChange={e => setForm(f => ({ ...f, downPayment: e.target.value }))}
-                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Financing Type</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">How are they paying?</label>
               <select
                 value={form.financingType}
-                onChange={e => setForm(f => ({ ...f, financingType: e.target.value }))}
+                onChange={e => {
+                  const val = e.target.value;
+                  setForm(f => ({
+                    ...f,
+                    financingType: val,
+                    downPayment: val === 'Cash' ? '100' : f.downPayment,
+                  }));
+                }}
                 className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
               >
-                <option>Conventional</option>
-                <option>FHA</option>
-                <option>VA</option>
-                <option>USDA</option>
-                <option>Cash</option>
-                <option>Other</option>
+                <option value="Cash">Paying cash (no mortgage)</option>
+                <option value="Conventional">Regular mortgage (20%+ down)</option>
+                <option value="Conventional-low">Regular mortgage (less than 20% down)</option>
+                <option value="FHA">Government-backed loan (FHA / VA / USDA)</option>
+                <option value="Other">Other / Not sure</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Closing Date</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">When do they want to close?</label>
               <input
                 type="date"
                 value={form.closingDate}
@@ -1013,8 +1011,11 @@ function OfferReviewTab({ report }: { report: Report }) {
                 className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Seller Concessions Requested</label>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-slate-600 mb-1">
+                Are they asking you to pay any of their closing costs?
+                <span className="ml-1 text-slate-400 font-normal">(leave blank if no)</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
                 <input
@@ -1029,31 +1030,37 @@ function OfferReviewTab({ report }: { report: Report }) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-2">Contingencies</label>
-            <div className="flex flex-wrap gap-4">
+            <label className="block text-xs font-medium text-slate-600 mb-2">
+              What are they allowed to back out for?
+              <span className="ml-1 text-slate-400 font-normal">(check all that apply)</span>
+            </label>
+            <div className="space-y-2">
               {[
-                { key: 'inspectionContingency', label: 'Inspection' },
-                { key: 'financingContingency', label: 'Financing' },
-                { key: 'appraisalContingency', label: 'Appraisal' },
-              ].map(({ key, label }) => (
-                <label key={key} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                { key: 'inspectionContingency', label: 'Home inspection', desc: 'They can cancel if the inspection finds problems' },
+                { key: 'financingContingency', label: 'Getting their loan approved', desc: 'They can cancel if their bank doesn\'t approve their mortgage' },
+                { key: 'appraisalContingency', label: 'Home appraisal', desc: 'They can cancel if the bank says the home is worth less than the offer price' },
+              ].map(({ key, label, desc }) => (
+                <label key={key} className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors">
                   <input
                     type="checkbox"
                     checked={form[key as keyof typeof form] as boolean}
                     onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
-                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                    className="mt-0.5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
                   />
-                  {label}
+                  <div>
+                    <p className="text-sm font-medium text-slate-700">{label}</p>
+                    <p className="text-xs text-slate-400">{desc}</p>
+                  </div>
                 </label>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Additional Notes (inclusions, exclusions, special terms)</label>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Anything else? (optional)</label>
             <textarea
               rows={3}
-              placeholder="e.g. Buyer wants refrigerator included. Requested 60-day leaseback..."
+              placeholder="e.g. They want the refrigerator included. They need 60 days to move in after closing. They offered to let you stay rent-free for 30 days..."
               value={form.notes}
               onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"

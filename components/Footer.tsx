@@ -33,6 +33,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/homeowner-login" className="hover:text-white transition-colors">
+                  Access My Report
+                </Link>
+              </li>
+              <li>
                 <Link href="/agent" className="hover:text-white transition-colors">
                   For Agents
                 </Link>
