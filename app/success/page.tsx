@@ -34,11 +34,11 @@ function SuccessContent() {
 
     try {
       const supabase = createClient();
-      const redirectTo = type === 'agent' ? '/dashboard' : '/homeowner-dashboard';
+      const callbackPath = type === 'agent' ? '/auth/callback' : '/auth/callback/homeowner';
       const { error } = await supabase.auth.signInWithOtp({
         email: agentEmail,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectTo)}`,
+          emailRedirectTo: `${window.location.origin}${callbackPath}`,
         },
       });
 

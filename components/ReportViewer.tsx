@@ -47,6 +47,7 @@ const TABS = [
   { key: 'legal', label: 'Legal', icon: Scale },
   { key: 'mls', label: 'MLS', icon: MapPin },
   { key: 'attorneys', label: 'Attorneys', icon: Users },
+  { key: 'staging', label: 'Virtual Staging', icon: Sofa },
 ] as const;
 
 const AGENT_TABS = [
@@ -54,7 +55,6 @@ const AGENT_TABS = [
   { key: 'buyercma', label: 'Buyer CMA', icon: BarChart3 },
   { key: 'openhouse', label: 'Open House', icon: Building },
   { key: 'market', label: 'Market', icon: TrendingUp },
-  { key: 'staging', label: 'Virtual Staging', icon: Sofa },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'] | (typeof AGENT_TABS)[number]['key'];
@@ -824,7 +824,7 @@ function MLSAccess() {
 /* ------------------------------------------------------------------ */
 /*  Tab: Attorneys                                                     */
 /* ------------------------------------------------------------------ */
-function AttorneysTab({ city }: { city: string }) {
+function AttorneysTab({ city, state }: { city: string; state: string }) {
   return (
     <div className="space-y-4">
       <div className="text-center mb-6">
@@ -832,10 +832,10 @@ function AttorneysTab({ city }: { city: string }) {
           Real Estate Attorneys Near You
         </h2>
         <p className="text-sm text-slate-500 mt-2 max-w-xl mx-auto">
-          An attorney can help protect your interests in your real estate closing. Here are vetted attorneys near your property.
+          An attorney can help protect your interests in your real estate closing. Here are attorneys near your property.
         </p>
       </div>
-      <AttorneyCards city={city} />
+      <AttorneyCards city={city} state={state} />
     </div>
   );
 }
@@ -1144,13 +1144,15 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={report.status} />
-          <button
-            onClick={handleDownload}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-          >
-            <Download className="h-4 w-4" />
-            Download Report
-          </button>
+          {agentMode && (
+            <button
+              onClick={handleDownload}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4" />
+              Download Report
+            </button>
+          )}
           <div className="relative">
             <button
               onClick={handleShare}
@@ -1217,7 +1219,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
         {activeTab === 'listing' && <ListingCopy report={report} />}
         {activeTab === 'legal' && <LegalPackage report={report} />}
         {activeTab === 'mls' && <MLSAccess />}
-        {activeTab === 'attorneys' && <AttorneysTab city={report.property_city} />}
+        {activeTab === 'attorneys' && <AttorneysTab city={report.property_city} state={report.property_state} />}
 
         {activeTab === 'social' && socialMedia && (
           <div className="space-y-6">

@@ -46,15 +46,14 @@ export default function HomeownerPage() {
         <div className="max-w-3xl mx-auto">
           <div className="text-center mb-10">
             <h1 className="text-3xl sm:text-4xl font-bold text-navy-800">
-              Sell Your Florida Home
+              Sell Your Home
             </h1>
             <p className="mt-3 text-lg text-slate-600">
               Complete the form below to get your AI-powered selling toolkit.
-              One payment, one comprehensive report.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
-              <span className="font-bold text-lg">$500</span>
-              <span>one-time payment</span>
+              <span className="font-bold text-lg">$100/mo</span>
+              <span>subscription</span>
             </div>
           </div>
 
