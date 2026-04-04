@@ -141,16 +141,39 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">11. Governing Law</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">11. Dispute Resolution & Arbitration</h2>
             <p>
-              These Terms shall be governed by and construed in accordance with applicable state law,
-              without regard to conflict of law principles. Any disputes shall
-              be resolved in the appropriate state or federal courts.
+              <strong>Please read this section carefully — it affects your legal rights.</strong>
+            </p>
+            <p className="mt-3">
+              Any dispute, claim, or controversy arising out of or relating to these Terms or the use of ListAI
+              shall be resolved exclusively through binding individual arbitration administered by the
+              American Arbitration Association (AAA) under its Consumer Arbitration Rules, rather than
+              in court. <strong>You waive your right to a jury trial and to participate in any class action
+              or class-wide arbitration.</strong>
+            </p>
+            <p className="mt-3">
+              Notwithstanding the above, either party may seek injunctive or other equitable relief in a court
+              of competent jurisdiction to prevent irreparable harm pending arbitration. Small claims court
+              actions that qualify under applicable rules are also exempt from this arbitration requirement.
+            </p>
+            <p className="mt-3">
+              To initiate arbitration, you must send written notice to <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">hello@listwithai.io</a>.
             </p>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">12. Modifications</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">12. Governing Law</h2>
+            <p>
+              These Terms shall be governed by and construed in accordance with the laws of the
+              State of Florida, without regard to conflict of law principles. To the extent any
+              dispute is not subject to arbitration, you consent to exclusive jurisdiction and
+              venue in the state or federal courts located in Lee County, Florida.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">13. Modifications</h2>
             <p>
               We reserve the right to modify these Terms at any time. Continued use of the
               Service after changes constitutes acceptance of the updated Terms.
@@ -158,11 +181,11 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">13. Contact</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">14. Contact</h2>
             <p>
               Questions about these Terms? Contact us at{' '}
-              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
-                evangelos@univentureprop.com
+              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
+                hello@listwithai.io
               </a>
             </p>
           </section>

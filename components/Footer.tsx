@@ -6,10 +6,13 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                <span className="text-navy-800 font-bold text-sm">L</span>
-              </div>
+            <div className="flex items-center gap-2.5 mb-4">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="32" height="32" rx="8" fill="white" fillOpacity="0.1"/>
+                <path d="M7 16L16 8L25 16" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <path d="M10 16V23H22V16" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+                <rect x="14" y="18" width="4" height="5" rx="1" fill="#3B82F6"/>
+              </svg>
               <span className="text-xl font-bold">
                 List<span className="text-blue-400">AI</span>
               </span>
@@ -46,8 +49,8 @@ export default function Footer() {
             <h4 className="font-semibold text-sm mb-3">Support</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <a href="mailto:evangelos@univentureprop.com" className="hover:text-white transition-colors">
-                  evangelos@univentureprop.com
+                <a href="mailto:hello@listwithai.io" className="hover:text-white transition-colors">
+                  hello@listwithai.io
                 </a>
               </li>
               <li>

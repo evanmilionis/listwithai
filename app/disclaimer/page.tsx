@@ -124,8 +124,8 @@ export default function DisclaimerPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">Contact</h2>
             <p>
               If you have questions about this disclaimer, contact us at{' '}
-              <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
-                evangelos@univentureprop.com
+              <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:underline">
+                hello@listwithai.io
               </a>
             </p>
           </section>

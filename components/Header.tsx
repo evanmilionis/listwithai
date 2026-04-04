@@ -12,9 +12,15 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-[#0A0F1E] rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-sm">L</span>
-            </div>
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="32" height="32" rx="8" fill="#0A0F1E"/>
+              {/* House roofline */}
+              <path d="M7 16L16 8L25 16" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* House body */}
+              <path d="M10 16V23H22V16" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* Door */}
+              <rect x="14" y="18" width="4" height="5" rx="1" fill="#3B82F6"/>
+            </svg>
             <span className="text-lg font-bold text-[#0A0F1E] tracking-tight">
               List<span className="text-blue-500">AI</span>
             </span>
