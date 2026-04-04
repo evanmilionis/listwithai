@@ -123,27 +123,53 @@ export async function POST(request: NextRequest) {
         }
 
         if (session.mode === 'subscription') {
-          // Check if subscription already exists (idempotency)
-          const { data: existingSub } = await supabase
-            .from('agent_subscriptions')
-            .select('id')
-            .eq('stripe_subscription_id', session.subscription as string)
-            .single();
+          if (session.metadata?.customer_type === 'homeowner' && session.metadata?.report_id) {
+            // Homeowner subscription
+            const { data: existingHomeSub } = await supabase
+              .from('homeowner_subscriptions')
+              .select('id')
+              .eq('stripe_subscription_id', session.subscription as string)
+              .single();
 
-          if (!existingSub) {
-            const { error: subError } = await supabase
+            if (!existingHomeSub) {
+              const { error: homeSubError } = await supabase
+                .from('homeowner_subscriptions')
+                .insert({
+                  email: session.customer_details?.email ?? '',
+                  name: session.customer_details?.name ?? '',
+                  stripe_customer_id: session.customer as string,
+                  stripe_subscription_id: session.subscription as string,
+                  report_id: session.metadata.report_id,
+                  status: 'active',
+                });
+
+              if (homeSubError) {
+                console.error('Failed to create homeowner subscription:', homeSubError);
+              }
+            }
+          } else {
+            // Agent subscription
+            const { data: existingSub } = await supabase
               .from('agent_subscriptions')
-              .insert({
-                stripe_customer_id: session.customer as string,
-                stripe_subscription_id: session.subscription as string,
-                email: session.customer_details?.email ?? '',
-                name: session.customer_details?.name ?? '',
-                status: 'active',
-                reports_run: 0,
-              });
+              .select('id')
+              .eq('stripe_subscription_id', session.subscription as string)
+              .single();
 
-            if (subError) {
-              console.error('Failed to create agent subscription:', subError);
+            if (!existingSub) {
+              const { error: subError } = await supabase
+                .from('agent_subscriptions')
+                .insert({
+                  stripe_customer_id: session.customer as string,
+                  stripe_subscription_id: session.subscription as string,
+                  email: session.customer_details?.email ?? '',
+                  name: session.customer_details?.name ?? '',
+                  status: 'active',
+                  reports_run: 0,
+                });
+
+              if (subError) {
+                console.error('Failed to create agent subscription:', subError);
+              }
             }
           }
         }
@@ -154,13 +180,32 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
 
-        const { error: updateError } = await supabase
+        // Try agent_subscriptions first
+        const { data: agentSubUpdated } = await supabase
           .from('agent_subscriptions')
-          .update({ status: subscription.status })
-          .eq('stripe_subscription_id', subscription.id);
+          .select('id')
+          .eq('stripe_subscription_id', subscription.id)
+          .single();
 
-        if (updateError) {
-          console.error('Failed to update subscription:', updateError);
+        if (agentSubUpdated) {
+          const { error: updateError } = await supabase
+            .from('agent_subscriptions')
+            .update({ status: subscription.status })
+            .eq('stripe_subscription_id', subscription.id);
+
+          if (updateError) {
+            console.error('Failed to update agent subscription:', updateError);
+          }
+        } else {
+          // Try homeowner_subscriptions
+          const { error: updateError } = await supabase
+            .from('homeowner_subscriptions')
+            .update({ status: subscription.status })
+            .eq('stripe_subscription_id', subscription.id);
+
+          if (updateError) {
+            console.error('Failed to update homeowner subscription:', updateError);
+          }
         }
 
         break;
@@ -169,13 +214,32 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.deleted': {
         const subscription = event.data.object as Stripe.Subscription;
 
-        const { error: updateError } = await supabase
+        // Try agent_subscriptions first
+        const { data: agentSubDeleted } = await supabase
           .from('agent_subscriptions')
-          .update({ status: 'canceled' })
-          .eq('stripe_subscription_id', subscription.id);
+          .select('id')
+          .eq('stripe_subscription_id', subscription.id)
+          .single();
 
-        if (updateError) {
-          console.error('Failed to cancel subscription:', updateError);
+        if (agentSubDeleted) {
+          const { error: updateError } = await supabase
+            .from('agent_subscriptions')
+            .update({ status: 'canceled' })
+            .eq('stripe_subscription_id', subscription.id);
+
+          if (updateError) {
+            console.error('Failed to cancel agent subscription:', updateError);
+          }
+        } else {
+          // Try homeowner_subscriptions
+          const { error: updateError } = await supabase
+            .from('homeowner_subscriptions')
+            .update({ status: 'canceled' })
+            .eq('stripe_subscription_id', subscription.id);
+
+          if (updateError) {
+            console.error('Failed to cancel homeowner subscription:', updateError);
+          }
         }
 
         break;

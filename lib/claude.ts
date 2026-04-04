@@ -13,8 +13,8 @@ import type {
   OpenHouseModule,
   MarketSnapshotModule,
 } from '@/types';
-import { getConditionLabel, formatCurrency } from '@/lib/utils';
-import { buildLegalDocuments, type TemplateVars } from '@/lib/legalTemplates';
+import { getConditionLabel } from '@/lib/utils';
+// Legal templates removed — legal module now uses a single Claude call for state-specific guidance
 
 // ---------------------------------------------------------------------------
 // Client (singleton — one instance for the entire report generation run)
@@ -145,7 +145,10 @@ export function buildPropertyContext(
         lotSize:         formMeta.lot_size,
         mortgageStatus:  formMeta.mortgage_status,
         flexibleOnPrice: formMeta.flexible_on_price,
-      } : {}),
+        hoaMonthlyAmount: formMeta?.hoa_monthly_amount ?? report.hoa_monthly_amount ?? null,
+      } : {
+        hoaMonthlyAmount: report.hoa_monthly_amount ?? null,
+      }),
     },
     rentcast:   trimmedRentcast,
     amenities:  trimmedAmenities,
@@ -321,19 +324,23 @@ export async function generateTimeline(
   rentcastData: RentcastData,
   ctx: PropertyContext
 ): Promise<TimelineModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are an expert Florida real estate consultant creating a personalized home selling timeline. Be specific, practical, and Florida-market aware. Format output as structured JSON.';
+    'You are an expert real estate consultant creating a personalized home selling timeline. Be specific, practical, and market-aware for the property\'s state and region. Format output as structured JSON.';
 
   const prompt = `Using the property context above, create a FSBO selling timeline organized by phase (not individual weeks).
 
-Note: Check _dataFlags — if market data is unavailable, use your knowledge of Florida market norms for timeline estimates.
+The property is in ${state}. Provide advice specific to that state's market, laws, and buyer demographics.
+
+Note: Check _dataFlags — if market data is unavailable, use your knowledge of regional market norms for timeline estimates.
 
 STRICT OUTPUT CONSTRAINTS:
 - Use 4-6 phases (e.g., "Pre-Listing Prep", "Active Marketing", "Offer & Negotiation", "Under Contract", "Closing"), NOT individual weeks
 - Each phase: 3-5 tasks MAX
 - Each task description: 1-2 sentences MAX (under 30 words)
 - timeline_summary: 2-3 sentences MAX
-- florida_specific_tips: exactly 4 tips
+- local_tips: exactly 4 tips
 - Keep total response under 3000 words
 
 Return JSON with this exact structure:
@@ -357,7 +364,7 @@ Return JSON with this exact structure:
       ]
     }
   ],
-  "florida_specific_tips": ["string"],
+  "local_tips": ["string"],
   "seasonal_note": "string"
 }`;
 
@@ -373,10 +380,14 @@ export async function generateImprovements(
   rentcastData: RentcastData,
   ctx: PropertyContext
 ): Promise<ImprovementsModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are an expert Florida home stager and real estate consultant who specializes in maximizing FSBO sale prices through strategic low-cost improvements. Always prioritize ROI.';
+    'You are an expert home stager and real estate consultant who specializes in maximizing FSBO sale prices through strategic low-cost improvements. Always prioritize ROI.';
 
   const prompt = `Using the property context above, recommend specific improvements to maximize sale price.
+
+The property is in ${state}. Provide advice specific to that state's market, climate, and buyer demographics.
 
 IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Acknowledge what the seller has already done and do NOT recommend improvements already completed.
 
@@ -385,7 +396,7 @@ STRICT OUTPUT CONSTRAINTS:
 - recommendations: exactly 5-7 items (not more)
 - Each "recommendation", "why" field: 1 sentence MAX
 - things_to_avoid: exactly 3-4 items, 1 sentence each
-- florida_staging_tips: exactly 3-4 items, 1 sentence each
+- staging_tips: exactly 3-4 items, 1 sentence each
 
 Return JSON with this exact structure:
 {
@@ -405,7 +416,7 @@ Return JSON with this exact structure:
     }
   ],
   "things_to_avoid": ["string (1 sentence each, 3-4 items)"],
-  "florida_staging_tips": ["string (1 sentence each, 3-4 items)"]
+  "staging_tips": ["string (1 sentence each, 3-4 items)"]
 }`;
 
   return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.improvements, 'improvements')) as ImprovementsModule | null;
@@ -420,13 +431,17 @@ export async function generatePricingAnalysis(
   rentcastData: RentcastData,
   ctx: PropertyContext
 ): Promise<PricingModule | null> {
-  const system =
-    'You are a Florida real estate pricing expert with deep knowledge of CMA (Comparative Market Analysis). Provide specific, data-driven pricing guidance based on real comp data.';
+  const state = report.property_state || 'the property\'s state';
 
-  const prompt = `Using the property context above, perform a Comparative Market Analysis for this Florida FSBO property.
+  const system =
+    'You are a real estate pricing expert with deep knowledge of CMA (Comparative Market Analysis). Provide specific, data-driven pricing guidance based on real comp data.';
+
+  const prompt = `Using the property context above, perform a Comparative Market Analysis for this FSBO property.
+
+The property is in ${state}. Provide advice specific to that state's market, laws, and buyer demographics.
 
 IMPORTANT: Check the _dataFlags in the context. If hasComps or hasMarket is false, the external market data API was unavailable. In that case:
-- Use the seller's asking price and your knowledge of the Florida market.
+- Use the seller's asking price and your knowledge of the regional market.
 - Note in pricing_summary that comp data was limited.
 - Do NOT fabricate comparable sales — leave comparable_analysis as an empty array.
 
@@ -435,7 +450,7 @@ STRICT OUTPUT CONSTRAINTS:
 - owner_price_assessment: 1-2 sentences
 - pricing_strategy: 2-3 sentences MAX
 - comparable_analysis: MAX 5 comps. "relevance" field: 1 sentence each
-- florida_market_context: 2-3 sentences MAX
+- market_context: 2-3 sentences MAX
 - price_reduction_triggers: exactly 3-4 items, 1 sentence each
 
 Return JSON with this exact structure:
@@ -463,7 +478,7 @@ Return JSON with this exact structure:
       "relevance": "string (1 sentence)"
     }
   ],
-  "florida_market_context": "string (2-3 sentences)",
+  "market_context": "string (2-3 sentences)",
   "price_reduction_triggers": ["string (1 sentence each, 3-4 items)"]
 }`;
 
@@ -480,10 +495,14 @@ export async function generateListingCopy(
   amenities: NearbyAmenities | null,
   ctx: PropertyContext
 ): Promise<ListingModule | null> {
-  const system =
-    "You are an elite Florida real estate copywriter who writes MLS listing descriptions that generate immediate buyer interest. You understand Florida buyer psychology — snowbirds, retirees, young families, investors. You never use generic phrases like 'must see' or 'won't last long'.";
+  const state = report.property_state || 'the property\'s state';
 
-  const prompt = `Using the property context above (which includes amenity data), write compelling listing copy for this Florida FSBO property.
+  const system =
+    "You are an elite real estate copywriter who writes MLS listing descriptions that generate immediate buyer interest. You understand buyer psychology for the property's state and region. You never use generic phrases like 'must see' or 'won't last long'.";
+
+  const prompt = `Using the property context above (which includes amenity data), write compelling listing copy for this FSBO property.
+
+The property is in ${state}. Tailor the copy to that state's buyer demographics and lifestyle appeal.
 
 STRICT OUTPUT CONSTRAINTS:
 - headline: under 15 words
@@ -492,7 +511,7 @@ STRICT OUTPUT CONSTRAINTS:
 - bullet_highlights: exactly 8 items, each under 10 words
 - seo_keywords: exactly 6 keywords
 - buyer_persona_targeted: 1 sentence
-- florida_lifestyle_angle: 1-2 sentences
+- lifestyle_angle: 1-2 sentences
 
 Return JSON with this exact structure:
 {
@@ -504,7 +523,7 @@ Return JSON with this exact structure:
   "open_house_description": "string (2-3 sentences)",
   "seo_keywords": ["string (exactly 6)"],
   "buyer_persona_targeted": "string (1 sentence)",
-  "florida_lifestyle_angle": "string (1-2 sentences)"
+  "lifestyle_angle": "string (1-2 sentences)"
 }`;
 
   return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.listingCopy, 'listing')) as ListingModule | null;
@@ -522,77 +541,61 @@ export async function generateLegalPackage(
   report: Report,
   ctx: PropertyContext
 ): Promise<LegalModule | null> {
+  const state = report.property_state || 'the property\'s state';
+  const address = `${report.property_address}, ${report.property_city}, ${state} ${report.property_zip}`;
 
-  // Step 1: Fill templates instantly — no Claude needed for the document text
-  const vars: TemplateVars = {
-    PROPERTY_ADDRESS: report.property_address,
-    PROPERTY_CITY:    report.property_city,
-    PROPERTY_STATE:   report.property_state ?? 'FL',
-    PROPERTY_ZIP:     report.property_zip,
-    SELLER_NAME:      report.customer_name,
-    ASKING_PRICE:     formatCurrency(report.asking_price),
-    TARGET_CLOSE_DATE: report.target_close_date ?? 'TBD',
-    CURRENT_DATE:     new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-    COUNTY:           report.property_city, // best approximation without county field
-  };
-
-  const documents = buildLegalDocuments(vars);
-
-  // Step 2: Small Claude call — only for clause explanations + attorney advisory
-  // This replaces the massive "write entire contracts from scratch" call
   const system =
-    'You are a Florida real estate paralegal. Explain legal concepts in plain English for FSBO sellers. Be concise and practical. Return only raw JSON.';
+    'You are a real estate paralegal specializing in the property\'s state. Explain legal concepts in plain English for FSBO sellers. Be concise and practical. Return only raw JSON.';
 
-  const prompt = `For a Florida FSBO home sale at ${vars.PROPERTY_ADDRESS}, provide:
-1. Plain-English explanations of the 5 most important clauses in a FL purchase agreement
-2. Attorney referral guidance
+  const prompt = `For a FSBO home sale in ${state} at ${address}, provide state-specific legal guidance.
 
-Return JSON with this exact structure:
+The property is in ${state}. Provide advice specific to that state's real estate laws, disclosure requirements, and closing procedures.
+
+STRICT OUTPUT CONSTRAINTS:
+- required_documents: 4-6 documents, description/why_needed/where_to_get: 1-2 sentences each
+- state_disclosures: 3-5 disclosures with statute references
+- key_clauses_explained: exactly 5 clauses, plain_english: 1-2 sentences each
+- closing_costs: 5-8 items
+- attorney_referral: intro 1-2 sentences, what_to_ask_them exactly 4 items, typical_cost 1 sentence, when_to_call 1 sentence
+
+Return JSON:
 {
-  "key_clauses_explained": [
-    { "clause": "string", "plain_english": "string" }
+  "disclaimer": "string",
+  "attorney_referral_note": "string",
+  "required_documents": [
+    {
+      "name": "string",
+      "description": "string (1-2 sentences)",
+      "why_needed": "string (1-2 sentences)",
+      "where_to_get": "string (1-2 sentences)"
+    }
   ],
-  "florida_attorney_referral": {
-    "intro": "string",
-    "what_to_ask_them": ["string"],
-    "typical_cost": "string",
-    "when_to_call": "string"
+  "state_disclosures": [
+    {
+      "name": "string",
+      "description": "string",
+      "statute_reference": "string"
+    }
+  ],
+  "key_clauses_explained": [
+    { "clause": "string", "plain_english": "string (1-2 sentences)" }
+  ],
+  "closing_costs": [
+    {
+      "item": "string",
+      "typical_range": "string",
+      "paid_by": "Seller|Buyer|Negotiable"
+    }
+  ],
+  "attorney_referral": {
+    "intro": "string (1-2 sentences)",
+    "what_to_ask_them": ["string (exactly 4 items)"],
+    "typical_cost": "string (1 sentence)",
+    "when_to_call": "string (1 sentence)"
   }
 }`;
 
-  const advisory = await callClaude(system, ctx, prompt, 1500, 'legal') as {
-    key_clauses_explained: { clause: string; plain_english: string }[];
-    florida_attorney_referral: {
-      intro: string;
-      what_to_ask_them: string[];
-      typical_cost: string;
-      when_to_call: string;
-    };
-  } | null;
-
-  // Step 3: Attach clause explanations to the first document (Purchase Agreement)
-  const documentsWithExplanations = documents.map((doc, i) => ({
-    ...doc,
-    key_clauses_explained: i === 0 ? (advisory?.key_clauses_explained ?? []) : [],
-  }));
-
-  return {
-    disclaimer:
-      'IMPORTANT: These are template documents for informational purposes only. They do NOT constitute legal advice and MUST be reviewed by a licensed Florida real estate attorney before use.',
-    attorney_referral_note:
-      'Florida law does not require an attorney for residential closings, but it is strongly recommended for FSBO sellers. A real estate attorney typically charges $400–$1,000 for contract review and closing oversight — a small cost relative to a transaction of this size.',
-    documents: documentsWithExplanations,
-    florida_attorney_referral: advisory?.florida_attorney_referral ?? {
-      intro: 'Find a Florida Bar-certified real estate attorney in your county.',
-      what_to_ask_them: [
-        'Do you handle FSBO closings?',
-        'What is your flat fee for contract review?',
-        'Can you act as closing agent?',
-      ],
-      typical_cost: '$400–$1,000 depending on complexity',
-      when_to_call: 'Before accepting any offer',
-    },
-  } as unknown as LegalModule;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.legal, 'legal')) as LegalModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -605,10 +608,14 @@ export async function generateSocialMedia(
   amenities: NearbyAmenities | null,
   ctx: PropertyContext
 ): Promise<SocialMediaModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are a top-performing real estate social media marketer. Write engaging, scroll-stopping social media content that drives inquiries. Know Florida buyer demographics. Never use generic cliches.';
+    'You are a top-performing real estate social media marketer. Write engaging, scroll-stopping social media content that drives inquiries. Know regional buyer demographics. Never use generic cliches.';
 
   const prompt = `Using the property context above, create social media marketing content for this listing.
+
+The property is in ${state}. Tailor content to that state's buyer demographics and lifestyle appeal.
 
 STRICT OUTPUT CONSTRAINTS:
 - instagram_caption: 100-150 words MAX
@@ -642,10 +649,14 @@ export async function generateBuyerCMA(
   rentcastData: RentcastData,
   ctx: PropertyContext
 ): Promise<BuyerCMAModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are a Florida real estate agent creating a buyer-facing CMA presentation. Your goal is to justify the listing price with data and position the property as a strong value. Be professional, data-driven, and persuasive without being pushy.';
+    'You are a real estate agent creating a buyer-facing CMA presentation. Your goal is to justify the listing price with data and position the property as a strong value. Be professional, data-driven, and persuasive without being pushy.';
 
   const prompt = `Using the property context above, create a buyer-facing CMA presentation.
+
+The property is in ${state}. Provide advice specific to that state's market and buyer demographics.
 
 STRICT OUTPUT CONSTRAINTS:
 - executive_summary: 2-3 sentences MAX
@@ -694,10 +705,14 @@ export async function generateOpenHouse(
   amenities: NearbyAmenities | null,
   ctx: PropertyContext
 ): Promise<OpenHouseModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are an experienced Florida listing agent preparing for an open house. Create practical, professional materials that help the agent run a successful open house and convert visitors to offers.';
+    'You are an experienced listing agent preparing for an open house. Create practical, professional materials that help the agent run a successful open house and convert visitors to offers.';
 
   const prompt = `Using the property context above, create an open house package.
+
+The property is in ${state}. Tailor materials to that state's market and buyer demographics.
 
 STRICT OUTPUT CONSTRAINTS:
 - property_fact_sheet: 150 words MAX (bullet-style, not paragraphs)
@@ -734,10 +749,14 @@ export async function generateMarketSnapshot(
   rentcastData: RentcastData,
   ctx: PropertyContext
 ): Promise<MarketSnapshotModule | null> {
+  const state = report.property_state || 'the property\'s state';
+
   const system =
-    'You are a Florida real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual market data provided — do not fabricate statistics.';
+    'You are a real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual market data provided — do not fabricate statistics.';
 
   const prompt = `Using the property context above (which includes real market data), create a market snapshot.
+
+The property is in ${state}. Provide insights specific to that state's market conditions.
 
 STRICT OUTPUT CONSTRAINTS:
 - market_summary: 2-3 sentences MAX

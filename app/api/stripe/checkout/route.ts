@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
         sqft: formData.sqft,
         condition_score: formData.condition_score,
         asking_price: formData.asking_price,
+        hoa_monthly_amount: formData.hoa_monthly_amount || null,
         target_close_date: formData.target_close_date,
         customer_type: 'homeowner',
         status: 'pending',
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
             lot_size: formData.lot_size,
             mortgage_status: formData.mortgage_status,
             flexible_on_price: formData.flexible_on_price,
+            hoa_monthly_amount: formData.hoa_monthly_amount || null,
           },
         },
       })
@@ -73,15 +75,17 @@ export async function POST(request: NextRequest) {
     }
 
     const session = await getStripe().checkout.sessions.create({
-      mode: 'payment',
+      mode: 'subscription',
       line_items: [
         {
-          price: process.env.STRIPE_HOMEOWNER_PRICE_ID!,
+          price: process.env.STRIPE_HOMEOWNER_SUB_PRICE_ID!,
           quantity: 1,
         },
       ],
+      customer_email: formData.customer_email,
       metadata: {
         report_id: report.id,
+        customer_type: 'homeowner',
       },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?session_id={CHECKOUT_SESSION_ID}&type=homeowner`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/homeowner`,

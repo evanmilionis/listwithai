@@ -148,6 +148,9 @@ function PropertySummary({ report }: { report: Report }) {
           <InfoItem label="Square Footage" value={report.sqft.toLocaleString()} />
           <InfoItem label="Condition" value={getConditionLabel(report.condition_score)} />
           <InfoItem label="Asking Price" value={formatCurrency(report.asking_price)} />
+          {report.hoa_monthly_amount && (
+            <InfoItem label="Monthly HOA" value={`$${report.hoa_monthly_amount}/mo`} />
+          )}
           <InfoItem label="Target Close" value={report.target_close_date} />
           <InfoItem label="Customer Type" value={report.customer_type === 'homeowner' ? 'Homeowner' : 'Agent'} />
         </div>
@@ -271,13 +274,13 @@ function SellingTimeline({ report }: { report: Report }) {
         })}
       </div>
 
-      {/* Florida tips */}
-      {(tl.florida_specific_tips ?? []).length > 0 && (
+      {/* Local tips */}
+      {(tl.local_tips ?? tl.florida_specific_tips ?? []).length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide">
-            Florida-Specific Tips
+            Local Tips
           </h3>
-          {(tl.florida_specific_tips ?? []).map((tip, i) => (
+          {(tl.local_tips ?? tl.florida_specific_tips ?? []).map((tip, i) => (
             <div
               key={i}
               className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
@@ -378,13 +381,13 @@ function ImprovementRecommendations({ report }: { report: Report }) {
         </div>
       )}
 
-      {/* Florida staging tips */}
-      {(imp.florida_staging_tips ?? []).length > 0 && (
+      {/* Staging tips */}
+      {(imp.staging_tips ?? imp.florida_staging_tips ?? []).length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide">
-            Florida Staging Tips
+            Staging Tips
           </h3>
-          {(imp.florida_staging_tips ?? []).map((tip, i) => (
+          {(imp.staging_tips ?? imp.florida_staging_tips ?? []).map((tip, i) => (
             <div
               key={i}
               className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
@@ -484,11 +487,11 @@ function PricingAnalysis({ report }: { report: Report }) {
         <p className="text-sm text-slate-600 leading-relaxed">{pr.pricing_strategy}</p>
       </div>
 
-      {/* Florida market context */}
-      {pr.florida_market_context && (
+      {/* Market context */}
+      {(pr.market_context ?? pr.florida_market_context) && (
         <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Florida Market Context</p>
-          <p className="text-sm text-slate-700 leading-relaxed">{pr.florida_market_context}</p>
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Market Context</p>
+          <p className="text-sm text-slate-700 leading-relaxed">{pr.market_context ?? pr.florida_market_context}</p>
         </div>
       )}
 
@@ -634,8 +637,8 @@ function ListingCopy({ report }: { report: Report }) {
         </div>
       </div>
 
-      {/* Buyer persona & FL angle */}
-      {(listing.buyer_persona_targeted || listing.florida_lifestyle_angle) && (
+      {/* Buyer persona & lifestyle angle */}
+      {(listing.buyer_persona_targeted || listing.lifestyle_angle || listing.florida_lifestyle_angle) && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {listing.buyer_persona_targeted && (
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -643,10 +646,10 @@ function ListingCopy({ report }: { report: Report }) {
               <p className="text-sm text-slate-700">{listing.buyer_persona_targeted}</p>
             </div>
           )}
-          {listing.florida_lifestyle_angle && (
+          {(listing.lifestyle_angle || listing.florida_lifestyle_angle) && (
             <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
-              <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Florida Lifestyle Angle</p>
-              <p className="text-sm text-blue-900">{listing.florida_lifestyle_angle}</p>
+              <p className="text-xs font-medium text-blue-600 uppercase tracking-wide mb-1">Lifestyle Angle</p>
+              <p className="text-sm text-blue-900">{listing.lifestyle_angle ?? listing.florida_lifestyle_angle}</p>
             </div>
           )}
         </div>
@@ -662,21 +665,116 @@ function LegalPackage({ report }: { report: Report }) {
   const legal = report.report_output?.legal;
   if (!legal) return <EmptyTab message="Legal package is not yet available." />;
 
+  const attyRef = legal.attorney_referral ?? legal.florida_attorney_referral;
+
   return (
     <div className="space-y-6">
       <Disclaimer variant="banner" />
 
-      {/* Documents */}
-      {(legal.documents ?? []).map((doc, i) => (
-        <ExpandableDocument key={i} doc={doc} />
+      {/* Required Documents (new format) */}
+      {(legal.required_documents ?? []).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">Required Documents</h3>
+          <div className="space-y-3">
+            {legal.required_documents.map((doc, i) => (
+              <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-start gap-3">
+                  <FileText className="h-5 w-5 text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-900">{doc.document_name}</h4>
+                    <p className="text-xs text-slate-600 mt-1">{doc.description}</p>
+                    <p className="text-xs text-slate-500 mt-1"><strong>Why:</strong> {doc.why_needed}</p>
+                    <p className="text-xs text-slate-500 mt-0.5"><strong>Where to get:</strong> {doc.where_to_get}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* State Disclosures (new format) */}
+      {(legal.state_disclosures ?? []).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">State-Specific Disclosures</h3>
+          <div className="space-y-3">
+            {legal.state_disclosures.map((d, i) => (
+              <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-900">{d.disclosure}</p>
+                {d.statute_reference && (
+                  <p className="text-xs text-blue-600 mt-0.5">{d.statute_reference}</p>
+                )}
+                <p className="text-xs text-slate-600 mt-1">{d.plain_english}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Key Clauses (new format) */}
+      {(legal.key_clauses_explained ?? []).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">Key Clauses Explained</h3>
+          <div className="space-y-2">
+            {legal.key_clauses_explained.map((kc, i) => (
+              <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-900">{kc.clause}</p>
+                <p className="text-xs text-slate-600 mt-1">{kc.plain_english}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Closing Costs (new format) */}
+      {(legal.closing_costs ?? []).length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-lg font-semibold text-navy-800 mb-4">Estimated Closing Costs</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                  <th className="py-2 pr-4">Item</th>
+                  <th className="py-2 pr-4">Who Pays</th>
+                  <th className="py-2">Estimated</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {legal.closing_costs.map((c, i) => (
+                  <tr key={i}>
+                    <td className="py-2 pr-4 text-slate-900 font-medium">{c.item}</td>
+                    <td className="py-2 pr-4 text-slate-600">{c.who_pays}</td>
+                    <td className="py-2 text-slate-600">{c.estimated_amount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Legacy documents (old FL reports) */}
+      {(legal.documents ?? []).map((doc: { document_name: string; description: string; template: string; key_clauses_explained: { clause: string; plain_english: string }[]; what_to_fill_in: string[] }, i: number) => (
+        <div key={i} className="rounded-xl border border-slate-200 bg-white shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <FileText className="h-5 w-5 text-slate-400" />
+            <div>
+              <h4 className="text-sm font-semibold text-slate-900">{doc.document_name}</h4>
+              <p className="text-xs text-slate-500 mt-0.5">{doc.description}</p>
+            </div>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-4 text-xs text-slate-700 leading-relaxed whitespace-pre-line font-mono">
+            {doc.template}
+          </div>
+        </div>
       ))}
 
-      {/* Florida attorney referral */}
-      {legal.florida_attorney_referral && (
+      {/* Attorney Referral (works for both new and legacy) */}
+      {attyRef && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">Florida Attorney Referral</h3>
+          <h3 className="text-lg font-semibold text-blue-900 mb-3">Attorney Referral</h3>
           <p className="text-sm text-blue-800 leading-relaxed mb-4">
-            {legal.florida_attorney_referral.intro}
+            {attyRef.intro}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             <div>
@@ -684,7 +782,7 @@ function LegalPackage({ report }: { report: Report }) {
                 What to Ask Them
               </p>
               <ul className="space-y-1.5">
-                {legal.florida_attorney_referral.what_to_ask_them.map((q, j) => (
+                {(attyRef.what_to_ask_them ?? []).map((q: string, j: number) => (
                   <li key={j} className="flex items-start gap-2 text-sm text-blue-900">
                     <ChevronRight className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
                     {q}
@@ -698,7 +796,7 @@ function LegalPackage({ report }: { report: Report }) {
                   Typical Cost
                 </p>
                 <p className="text-sm text-blue-900 font-medium">
-                  {legal.florida_attorney_referral.typical_cost}
+                  {attyRef.typical_cost}
                 </p>
               </div>
               <div>
@@ -706,89 +804,11 @@ function LegalPackage({ report }: { report: Report }) {
                   When to Call
                 </p>
                 <p className="text-sm text-blue-900 font-medium">
-                  {legal.florida_attorney_referral.when_to_call}
+                  {attyRef.when_to_call}
                 </p>
               </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ExpandableDocument({
-  doc,
-}: {
-  doc: NonNullable<Report['report_output']>['legal'] extends { documents: (infer D)[] } | null ? D : never;
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between p-5 text-left hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-slate-400" />
-          <div>
-            <h4 className="text-sm font-semibold text-slate-900">{doc.document_name}</h4>
-            <p className="text-xs text-slate-500 mt-0.5">{doc.description}</p>
-          </div>
-        </div>
-        {open ? (
-          <ChevronDown className="h-5 w-5 text-slate-400 flex-shrink-0" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-slate-400 flex-shrink-0" />
-        )}
-      </button>
-
-      {open && (
-        <div className="px-5 pb-5 space-y-4 border-t border-slate-100 pt-4">
-          {/* Template text */}
-          <div>
-            <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-              Template
-            </h5>
-            <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-700 leading-relaxed whitespace-pre-line font-mono text-xs">
-              {doc.template}
-            </div>
-          </div>
-
-          {/* Key clauses */}
-          {doc.key_clauses_explained.length > 0 && (
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Key Clauses Explained
-              </h5>
-              <div className="space-y-2">
-                {doc.key_clauses_explained.map((kc, i) => (
-                  <div key={i} className="rounded-lg border border-slate-100 bg-slate-50 p-3">
-                    <p className="text-xs font-semibold text-slate-900">{kc.clause}</p>
-                    <p className="text-xs text-slate-600 mt-1">{kc.plain_english}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Fields to fill */}
-          {doc.what_to_fill_in.length > 0 && (
-            <div>
-              <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                Fields to Fill In
-              </h5>
-              <ul className="space-y-1.5">
-                {doc.what_to_fill_in.map((field, i) => (
-                  <li key={i} className="flex items-start gap-2 text-xs text-slate-600">
-                    <ChevronRight className="h-3 w-3 text-slate-400 mt-0.5 flex-shrink-0" />
-                    {field}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -810,10 +830,10 @@ function AttorneysTab({ city }: { city: string }) {
     <div className="space-y-4">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Your Florida Real Estate Attorneys
+          Real Estate Attorneys Near You
         </h2>
         <p className="text-sm text-slate-500 mt-2 max-w-xl mx-auto">
-          Florida law requires attorney involvement in real estate closings. Here are vetted attorneys near your property.
+          An attorney can help protect your interests in your real estate closing. Here are vetted attorneys near your property.
         </p>
       </div>
       <AttorneyCards city={city} />
@@ -977,9 +997,10 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
         });
         html += `</div>`;
       });
-      if (tl.florida_specific_tips.length > 0) {
-        html += `<h3>Florida Tips</h3>`;
-        tl.florida_specific_tips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
+      const localTips = tl.local_tips ?? tl.florida_specific_tips ?? [];
+      if (localTips.length > 0) {
+        html += `<h3>Local Tips</h3>`;
+        localTips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
       }
       if (tl.seasonal_note) html += `<div class="tip">${tl.seasonal_note}</div>`;
     }
@@ -1002,9 +1023,10 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
         html += `<h3>Things to Avoid</h3>`;
         imp.things_to_avoid.forEach(item => { html += `<div class="warning">${item}</div>`; });
       }
-      if (imp.florida_staging_tips.length > 0) {
-        html += `<h3>Florida Staging Tips</h3>`;
-        imp.florida_staging_tips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
+      const stagingTips = imp.staging_tips ?? imp.florida_staging_tips ?? [];
+      if (stagingTips.length > 0) {
+        html += `<h3>Staging Tips</h3>`;
+        stagingTips.forEach(tip => { html += `<div class="tip">${tip}</div>`; });
       }
     }
 
@@ -1023,7 +1045,8 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       html += `<div class="grid-item"><dt>DOM Prediction</dt><dd>${pr.days_on_market_prediction}</dd></div>`;
       html += `</div>`;
       html += `<div class="card"><h3>Pricing Strategy</h3><p>${pr.pricing_strategy}</p></div>`;
-      if (pr.florida_market_context) html += `<div class="tip">${pr.florida_market_context}</div>`;
+      const mktCtx = pr.market_context ?? pr.florida_market_context;
+      if (mktCtx) html += `<div class="tip">${mktCtx}</div>`;
 
       if (pr.comparable_analysis.length > 0) {
         html += `<h3>Comparable Sales</h3><table><thead><tr><th>Address</th><th>Price</th><th>SqFt</th><th>$/SqFt</th><th>Beds</th><th>Baths</th><th>Date</th></tr></thead><tbody>`;
@@ -1055,10 +1078,34 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       const legal = output.legal;
       html += `<h2 class="page-break">Legal Package</h2>`;
       html += `<div class="disclaimer">${legal.disclaimer}</div>`;
-      legal.documents.forEach(doc => {
+      // New format: required documents + state disclosures + closing costs
+      (legal.required_documents ?? []).forEach(doc => {
+        html += `<div class="card"><h3>${doc.document_name}</h3><p>${doc.description}</p><p><em>Why: ${doc.why_needed}</em></p><p><em>Where: ${doc.where_to_get}</em></p></div>`;
+      });
+      if ((legal.state_disclosures ?? []).length > 0) {
+        html += `<h3>State Disclosures</h3>`;
+        legal.state_disclosures.forEach(d => {
+          html += `<div class="card"><p><strong>${d.disclosure}</strong>${d.statute_reference ? ` (${d.statute_reference})` : ''}</p><p>${d.plain_english}</p></div>`;
+        });
+      }
+      if ((legal.key_clauses_explained ?? []).length > 0) {
+        html += `<h3>Key Clauses</h3>`;
+        legal.key_clauses_explained.forEach(kc => {
+          html += `<p><strong>${kc.clause}:</strong> ${kc.plain_english}</p>`;
+        });
+      }
+      if ((legal.closing_costs ?? []).length > 0) {
+        html += `<h3>Closing Costs</h3><table><thead><tr><th>Item</th><th>Who Pays</th><th>Estimated</th></tr></thead><tbody>`;
+        legal.closing_costs.forEach(c => {
+          html += `<tr><td>${c.item}</td><td>${c.who_pays}</td><td>${c.estimated_amount}</td></tr>`;
+        });
+        html += `</tbody></table>`;
+      }
+      // Legacy format: old FL template documents
+      (legal.documents ?? []).forEach((doc: { document_name: string; description: string; template: string; key_clauses_explained: { clause: string; plain_english: string }[] }) => {
         html += `<div class="card"><h3>${doc.document_name}</h3><p><em>${doc.description}</em></p>`;
         html += `<pre style="white-space:pre-wrap;font-size:12px;background:#f8fafc;padding:12px;border-radius:6px;border:1px solid #e2e8f0;margin:8px 0;">${doc.template}</pre>`;
-        if (doc.key_clauses_explained.length > 0) {
+        if ((doc.key_clauses_explained ?? []).length > 0) {
           html += `<h3>Key Clauses</h3>`;
           doc.key_clauses_explained.forEach(kc => {
             html += `<p><strong>${kc.clause}:</strong> ${kc.plain_english}</p>`;

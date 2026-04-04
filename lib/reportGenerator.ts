@@ -62,9 +62,17 @@ export async function generateReport(reportId: string): Promise<void> {
     let rentcastData: RentcastData;
     let amenities: NearbyAmenities | null;
 
-    if (typedReport.rentcast_data && Object.keys(typedReport.rentcast_data).length > 0) {
+    // Only use cached data if at least one Rentcast field has actual data.
+    // Previously failed reports cache {property:null, valuation:null, market:null}
+    // which passed the old Object.keys check but contained no useful data.
+    const cached = typedReport.rentcast_data as RentcastData | null;
+    const hasActualRentcastData = cached && (
+      cached.property !== null || cached.valuation !== null || cached.market !== null
+    );
+
+    if (hasActualRentcastData) {
       console.log('Using cached Rentcast data (skipping API call)');
-      rentcastData = typedReport.rentcast_data as RentcastData;
+      rentcastData = cached;
       const existingAmenities = (typedReport.report_output as ReportOutput)?.amenities;
       amenities = existingAmenities ?? await fetchNearbyAmenities(
         typedReport.property_address,

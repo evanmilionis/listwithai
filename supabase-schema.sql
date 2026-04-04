@@ -136,3 +136,48 @@ CREATE POLICY "Users can link own subscription"
 --   WITH CHECK (
 --     user_id = auth.uid()
 --   );
+
+-- ============================================================
+-- MIGRATION: Homeowner subscriptions + HOA field (April 2026)
+-- ============================================================
+
+-- Homeowner subscriptions table
+CREATE TABLE IF NOT EXISTS homeowner_subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT NOT NULL,
+  name TEXT NOT NULL,
+  stripe_customer_id TEXT NOT NULL,
+  stripe_subscription_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'canceled', 'past_due')),
+  report_id UUID REFERENCES reports(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_homeowner_subs_user_id ON homeowner_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_homeowner_subs_email ON homeowner_subscriptions(email);
+CREATE INDEX IF NOT EXISTS idx_homeowner_subs_stripe ON homeowner_subscriptions(stripe_subscription_id);
+
+ALTER TABLE homeowner_subscriptions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Homeowners can view own subscription"
+  ON homeowner_subscriptions FOR SELECT
+  USING (
+    auth.uid() = user_id
+    OR (user_id IS NULL AND email = auth.jwt()->>'email')
+  );
+
+CREATE POLICY "Homeowners can link own subscription"
+  ON homeowner_subscriptions FOR UPDATE
+  USING (user_id IS NULL AND email = auth.jwt()->>'email')
+  WITH CHECK (user_id = auth.uid());
+
+-- Add HOA monthly amount to reports
+ALTER TABLE reports ADD COLUMN IF NOT EXISTS hoa_monthly_amount DECIMAL;
+
+-- Add processed_events table for webhook idempotency (if not exists)
+CREATE TABLE IF NOT EXISTS processed_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stripe_event_id TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);

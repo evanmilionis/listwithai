@@ -36,7 +36,7 @@ export default function DisclaimerPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">Not Real Estate Advice</h2>
             <p>
               ListAI is <strong>not</strong> a licensed real estate broker, agent, or salesperson
-              in the State of Florida or any other jurisdiction. We do not represent buyers or
+              in any jurisdiction. We do not represent buyers or
               sellers in any real estate transaction. Our pricing analysis and comparable market
               data are AI-generated estimates — they are <strong>not</strong> formal appraisals
               and should not be treated as such.
@@ -49,13 +49,13 @@ export default function DisclaimerPage() {
               ListAI is <strong>not</strong> a law firm or licensed attorney. The legal document
               templates provided in our reports are generic templates for informational purposes.
               They have <strong>not</strong> been reviewed by an attorney for your specific
-              transaction. Florida real estate transactions involve complex legal requirements
+              transaction. Real estate transactions involve complex legal requirements
               including title searches, lien releases, HOA estoppel letters, and mandatory
               disclosures.
             </p>
             <p className="mt-3 font-semibold">
-              You MUST have all legal documents reviewed by a licensed Florida real estate
-              attorney before signing or using them in any transaction.
+              You MUST have all legal documents reviewed by a licensed real estate
+              attorney in your state before signing or using them in any transaction.
             </p>
           </section>
 
@@ -91,13 +91,13 @@ export default function DisclaimerPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">Florida-Specific Notice</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">State-Specific Notice</h2>
             <p>
-              Florida real estate law has specific requirements for FSBO (For Sale By Owner)
+              Real estate law varies by state and has specific requirements for FSBO (For Sale By Owner)
               transactions, including but not limited to:
             </p>
             <ul className="list-disc pl-6 space-y-2 mt-2">
-              <li>Mandatory seller disclosure requirements (Florida Statute &sect;689.25)</li>
+              <li>Mandatory seller disclosure requirements (your state&apos;s specific disclosure requirements)</li>
               <li>Lead-based paint disclosure for homes built before 1978</li>
               <li>HOA/condo association disclosure requirements</li>
               <li>Title insurance and closing procedures</li>
@@ -106,7 +106,7 @@ export default function DisclaimerPage() {
             </ul>
             <p className="mt-3">
               ListAI reports may not cover all legal requirements applicable to your specific
-              property and transaction. Consult a licensed Florida real estate attorney.
+              property and transaction. Consult a licensed real estate attorney in your state.
             </p>
           </section>
 

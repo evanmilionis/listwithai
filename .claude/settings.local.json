@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mv temp-app/* temp-app/.* .)",
+      "Bash(rm -rf temp-app)",
+      "Bash(npm install:*)",
+      "Bash(ls /Users/evangelosmilionis/Desktop/Listwithai/app/report/[id]/page.tsx)",
+      "Bash(ls /Users/evangelosmilionis/Desktop/Listwithai/app/dashboard/report/[id]/page.tsx)",
+      "Bash(ls -la /Users/evangelosmilionis/Desktop/Listwithai/app/report/[id]/page.tsx)",
+      "Bash(npx next:*)",
+      "Bash(open /Users/evangelosmilionis/Desktop/Listwithai/supabase-schema.sql)",
+      "Bash(npm run:*)",
+      "Bash(brew install:*)",
+      "Bash(stripe login:*)",
+      "Bash(stripe listen:*)",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\({path: ''/Users/evangelosmilionis/Desktop/Listwithai/.env.local''}\\); console.log\\(''Key exists:'', !!process.env.ANTHROPIC_API_KEY\\); console.log\\(''Key starts with:'', process.env.ANTHROPIC_API_KEY?.substring\\(0, 15\\)\\)\")",
+      "Bash(lsof -i:3000)",
+      "Bash(curl -s -X POST http://localhost:3000/api/report/generate -H \"Content-Type: application/json\" -d '{\"\"reportId\"\":\"\"4d513a85-aecc-4463-870c-de79cbe75ede\"\"}')",
+      "Bash(node -e \":*)",
+      "Read(//Users/evangelosmilionis/Desktop/backroadsorion/**)",
+      "Bash(npm init:*)",
+      "Bash(npx tsc:*)",
+      "Bash(code /Users/evangelosmilionis/Desktop/backroadsorion/supabase-schema.sql)",
+      "Bash(open -a \"Visual Studio Code\" /Users/evangelosmilionis/Desktop/backroadsorion/supabase-schema.sql)",
+      "Bash(npm start:*)",
+      "Bash(node -e \"require\\(''dotenv''\\).config\\(\\); console.log\\(''KEY:'', process.env.ANTHROPIC_API_KEY ? ''SET \\('' + process.env.ANTHROPIC_API_KEY.substring\\(0,15\\) + ''...\\)'' : ''NOT SET''\\); console.log\\(''CWD:'', process.cwd\\(\\)\\)\")",
+      "Bash(node -e \"const fs = require\\(''fs''\\); const content = fs.readFileSync\\(''.env'', ''utf8''\\); console.log\\(JSON.stringify\\(content\\)\\)\")",
+      "Bash(node -e \"const result = require\\(''dotenv''\\).config\\({ debug: true }\\); console.log\\(''Parsed keys:'', Object.keys\\(result.parsed || {}\\)\\)\")",
+      "Bash(lsof -ti:3000)",
+      "Bash(xargs kill:*)",
+      "Bash(npx ts-node:*)",
+      "WebFetch(domain:status.anthropic.com)",
+      "WebFetch(domain:status.claude.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(git revert:*)",
+      "Bash(npx create-video@latest)"
+    ]
+  }
+}

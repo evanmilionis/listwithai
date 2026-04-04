@@ -18,7 +18,7 @@ const features = [
     icon: Clock,
     title: 'Custom Selling Timeline',
     description:
-      'Week-by-week action plan tailored to your property, condition, and Florida market timing.',
+      'Week-by-week action plan tailored to your property, condition, and local market timing.',
   },
   {
     icon: TrendingUp,
@@ -30,7 +30,7 @@ const features = [
     icon: PenTool,
     title: 'Premium Listing Copy',
     description:
-      'MLS-ready descriptions that target the right Florida buyers — snowbirds, families, or investors.',
+      'MLS-ready descriptions that target the right buyers — families, investors, or relocators.',
   },
   {
     icon: Home,
@@ -42,7 +42,7 @@ const features = [
     icon: FileText,
     title: 'Legal Document Templates',
     description:
-      'Florida AS-IS contract, seller disclosure, and counter-offer templates with plain-English explanations.',
+      'State-specific contracts, seller disclosure, and counter-offer templates with plain-English explanations.',
   },
 ];
 
@@ -70,11 +70,11 @@ const steps = [
 const faqs = [
   {
     q: 'Is this legal advice?',
-    a: 'No. ListAI provides AI-generated informational templates and guidance only. All legal documents must be reviewed by a licensed Florida real estate attorney before use. We include attorney referrals in every report.',
+    a: 'No. ListAI provides AI-generated informational templates and guidance only. All legal documents must be reviewed by a licensed real estate attorney before use. We include attorney referrals in every report.',
   },
   {
-    q: 'What do I get for $500?',
-    a: 'A comprehensive 5-module report: selling timeline, improvement recommendations with ROI, data-driven pricing analysis, premium MLS listing copy, and Florida legal document templates with attorney referrals.',
+    q: 'What do I get for $100/mo?',
+    a: 'A comprehensive 5-module report: selling timeline, improvement recommendations with ROI, data-driven pricing analysis, premium MLS listing copy, and state-specific legal guidance with attorney referrals.',
   },
   {
     q: 'Do I still need to get on the MLS?',
@@ -85,8 +85,8 @@ const faqs = [
     a: "Our pricing analysis uses real comparable sales data from Rentcast, current market statistics, and AI analysis. It's based on the same data agents use for CMAs, but you should always validate with local market knowledge.",
   },
   {
-    q: 'Is this only for Florida?',
-    a: 'Yes. ListAI is built specifically for the Florida real estate market, with Florida-specific legal templates, market insights, and seasonal buyer analysis.',
+    q: 'What states do you cover?',
+    a: 'All 50 states. ListAI generates state-specific reports tailored to your local market, laws, and buyer demographics.',
   },
   {
     q: "What if I'm a real estate agent?",
@@ -128,20 +128,20 @@ export default function LandingPage() {
               <span>As featured in NBC Miami</span>
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-tight">
-              Sell Your Florida Home.
+              Sell Your Home.
               <br />
               <span className="text-blue-400">Keep the Commission.</span>
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
               The AI toolkit that handles pricing, listing copy, timeline, and
-              contracts — for a flat $500. No realtor needed.
+              contracts — for just $100/mo. No realtor needed.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/homeowner"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-white text-navy-800 text-lg font-semibold rounded-xl hover:bg-slate-100 transition-all shadow-lg hover:shadow-xl"
               >
-                Start My Home Sale — $500
+                Start My Home Sale — $100/mo
                 <ArrowRight size={20} />
               </Link>
               <Link
@@ -153,7 +153,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-slate-400">
-              Florida homeowners have saved an average of $15,000 in agent
+              Homeowners have saved an average of $15,000 in agent
               commissions
             </p>
           </div>
@@ -194,7 +194,7 @@ export default function LandingPage() {
                   Save $15,000+ in Commissions
                 </h3>
                 <p className="text-slate-300 text-sm leading-relaxed">
-                  The average Florida listing agent commission is 2.5-3%. On a
+                  The average listing agent commission is 2.5-3%. On a
                   $350K home, that&apos;s $8,750-$10,500 — gone. Keep it.
                 </p>
               </div>
@@ -247,11 +247,11 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-xl font-bold text-navy-800">Homeowner</h3>
                 <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-navy-800">$500</span>
-                  <span className="text-slate-500">one-time</span>
+                  <span className="text-4xl font-bold text-navy-800">$100</span>
+                  <span className="text-slate-500">/month</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">
-                  Everything you need to sell your Florida home without an agent.
+                  Everything you need to sell your home without an agent.
                 </p>
                 <ul className="mt-6 space-y-3">
                   {[
@@ -259,7 +259,7 @@ export default function LandingPage() {
                     'Data-driven pricing analysis',
                     'Premium MLS listing copy',
                     'Improvement ROI guide',
-                    'FL legal document templates',
+                    'State-specific legal guidance',
                     'Attorney referrals by region',
                     'MLS partner access ($99-299)',
                     'Post-sale email support',
@@ -292,7 +292,7 @@ export default function LandingPage() {
                   <span className="text-slate-500">/month</span>
                 </div>
                 <p className="mt-3 text-sm text-slate-600">
-                  Unlimited AI reports for licensed Florida real estate agents.
+                  Unlimited AI reports for licensed real estate agents.
                 </p>
                 <ul className="mt-6 space-y-3">
                   {[
@@ -354,7 +354,7 @@ export default function LandingPage() {
         <section className="py-20 px-4 sm:px-6 lg:px-8 bg-navy-800">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl sm:text-4xl font-bold text-white">
-              Ready to Sell Your Florida Home?
+              Ready to Sell Your Home?
             </h2>
             <p className="mt-4 text-lg text-slate-300">
               Get your AI-powered selling toolkit in minutes. No agent needed.
@@ -363,7 +363,7 @@ export default function LandingPage() {
               href="/homeowner"
               className="mt-8 inline-flex items-center gap-2 px-8 py-4 bg-white text-navy-800 text-lg font-semibold rounded-xl hover:bg-slate-100 transition-all"
             >
-              Start My Home Sale — $500
+              Start My Home Sale — $100/mo
               <ArrowRight size={20} />
             </Link>
           </div>

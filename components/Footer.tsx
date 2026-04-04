@@ -15,7 +15,7 @@ export default function Footer() {
               </span>
             </div>
             <p className="text-slate-400 text-sm max-w-md">
-              AI-powered home selling toolkit for Florida homeowners and real
+              AI-powered home selling toolkit for homeowners and real
               estate agents. Pricing analysis, listing copy, timeline, and legal
               templates — all in one report.
             </p>
@@ -80,7 +80,7 @@ export default function Footer() {
             is intended for informational and educational purposes only. It does
             not constitute legal, financial, or real estate advice. ListAI is not
             a licensed real estate broker, agent, or attorney and does not
-            represent buyers or sellers in any transaction. Florida real estate
+            represent buyers or sellers in any transaction. Real estate
             transactions involve complex legal requirements — please consult a
             licensed professional before proceeding.
           </p>

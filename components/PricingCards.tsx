@@ -56,11 +56,11 @@ export default function PricingCards({
         </div>
         <div className="mb-6 pt-2">
           <h3 className="text-lg font-semibold text-slate-900">Homeowner</h3>
-          <p className="text-sm text-slate-500 mt-1">Everything you need to sell FSBO in Florida</p>
+          <p className="text-sm text-slate-500 mt-1">Everything you need to sell your home FSBO</p>
         </div>
         <div className="mb-6">
-          <span className="text-4xl font-bold text-slate-900 tracking-tight">$500</span>
-          <span className="text-sm text-slate-500 ml-2">one-time</span>
+          <span className="text-4xl font-bold text-slate-900 tracking-tight">$100</span>
+          <span className="text-sm text-slate-500 ml-2">/month</span>
         </div>
         <ul className="space-y-3 mb-8">
           {homeownerFeatures.map((feature) => (

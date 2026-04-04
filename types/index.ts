@@ -31,6 +31,7 @@ export interface Report {
   sold_date: string | null;
   followup_stage: number;
   report_url: string | null;
+  hoa_monthly_amount: number | null;
 }
 
 export interface AgentSubscription {
@@ -49,6 +50,18 @@ export interface AgentSubscription {
   license_number: string | null;
   photo_url: string | null;
   tagline: string | null;
+}
+
+export interface HomeownerSubscription {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  email: string;
+  name: string;
+  stripe_customer_id: string;
+  stripe_subscription_id: string;
+  status: SubscriptionStatus;
+  report_id: string | null;
 }
 
 // Lead (sales funnel / abandoned cart)
@@ -100,6 +113,7 @@ export interface IntakeFormData {
   other_improvements: string;
   mortgage_status: 'Own free & clear' | 'Has mortgage' | 'Unknown';
   flexible_on_price: boolean;
+  hoa_monthly_amount?: number;
   // Step 3: Contact
   customer_name: string;
   customer_email: string;
@@ -233,7 +247,8 @@ export interface TimelineModule {
       estimated_hours: number;
     }[];
   }[];
-  florida_specific_tips: string[];
+  local_tips: string[];
+  florida_specific_tips?: string[];
   seasonal_note: string;
 }
 
@@ -252,7 +267,8 @@ export interface ImprovementsModule {
     time_to_complete: string;
   }[];
   things_to_avoid: string[];
-  florida_staging_tips: string[];
+  staging_tips: string[];
+  florida_staging_tips?: string[];
 }
 
 export interface PricingModule {
@@ -277,7 +293,8 @@ export interface PricingModule {
     distance: string;
     relevance: string;
   }[];
-  florida_market_context: string;
+  market_context: string;
+  florida_market_context?: string;
   price_reduction_triggers: string[];
 }
 
@@ -290,23 +307,48 @@ export interface ListingModule {
   open_house_description: string;
   seo_keywords: string[];
   buyer_persona_targeted: string;
-  florida_lifestyle_angle: string;
+  lifestyle_angle: string;
+  florida_lifestyle_angle?: string;
 }
 
 export interface LegalModule {
   disclaimer: string;
   attorney_referral_note: string;
-  documents: {
+  required_documents: {
+    document_name: string;
+    description: string;
+    why_needed: string;
+    where_to_get: string;
+  }[];
+  state_disclosures: {
+    disclosure: string;
+    statute_reference: string;
+    plain_english: string;
+  }[];
+  key_clauses_explained: {
+    clause: string;
+    plain_english: string;
+  }[];
+  closing_costs: {
+    item: string;
+    who_pays: string;
+    estimated_amount: string;
+  }[];
+  attorney_referral: {
+    intro: string;
+    what_to_ask_them: string[];
+    typical_cost: string;
+    when_to_call: string;
+  };
+  // Legacy backwards compat
+  documents?: {
     document_name: string;
     description: string;
     template: string;
-    key_clauses_explained: {
-      clause: string;
-      plain_english: string;
-    }[];
+    key_clauses_explained: { clause: string; plain_english: string }[];
     what_to_fill_in: string[];
   }[];
-  florida_attorney_referral: {
+  florida_attorney_referral?: {
     intro: string;
     what_to_ask_them: string[];
     typical_cost: string;
@@ -377,6 +419,16 @@ export interface MarketSnapshotModule {
     sold_date: string;
     dom: number;
   }[];
+}
+
+export interface PlacesAttorney {
+  name: string;
+  address: string;
+  rating?: number;
+  total_ratings?: number;
+  phone?: string;
+  website?: string;
+  distance_miles: number;
 }
 
 // Attorney data types

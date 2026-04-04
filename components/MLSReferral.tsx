@@ -16,11 +16,11 @@ const houzeoFeatures = [
 ];
 
 const freedomFeatures = [
-  'Florida MLS + syndication to major portals',
+  'Local MLS + syndication to major portals',
   'Up to 25 photos on MLS',
   'Showing scheduling tools',
   'Contracts & forms package',
-  'Florida-focused support team',
+  'Dedicated support team',
 ];
 
 function FeatureItem({ text }: { text: string }) {
@@ -76,7 +76,7 @@ export default function MLSReferral({ className }: MLSReferralProps) {
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-lg hover:border-slate-300">
           <div className="mb-4">
             <h3 className="text-lg font-semibold text-slate-900">ListWithFreedom</h3>
-            <p className="text-sm text-slate-500 mt-0.5">Florida-focused flat-fee MLS</p>
+            <p className="text-sm text-slate-500 mt-0.5">Flat-fee MLS service</p>
           </div>
           <div className="mb-5">
             <span className="text-3xl font-bold text-slate-900 tracking-tight">$99–$295</span>

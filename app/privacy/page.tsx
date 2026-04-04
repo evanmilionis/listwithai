@@ -26,7 +26,7 @@ export default function PrivacyPage() {
             <p>
               ListAI (&quot;we,&quot; &quot;us,&quot; or &quot;our&quot;) operates the website{' '}
               <strong>listwithai.io</strong> and provides AI-powered home selling tools for
-              Florida homeowners and real estate agents. Our contact email is{' '}
+              homeowners and real estate agents. Our contact email is{' '}
               <a href="mailto:evangelos@univentureprop.com" className="text-blue-600 hover:underline">
                 evangelos@univentureprop.com
               </a>.

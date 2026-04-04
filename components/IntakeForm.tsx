@@ -33,7 +33,7 @@ const BEDROOM_OPTIONS = Array.from({ length: 8 }, (_, i) => ({
   label: String(i + 1),
 }));
 
-const BATHROOM_OPTIONS = ['1', '1.5', '2', '2.5', '3', '3.5', '4', '4+'].map(
+const BATHROOM_OPTIONS = ['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5', '5+'].map(
   (v) => ({ value: v, label: v })
 );
 
@@ -50,6 +50,13 @@ const MORTGAGE_OPTIONS = [
   { value: 'Has mortgage', label: 'Has mortgage' },
   { value: 'Unknown', label: 'Unknown' },
 ];
+
+const US_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+  'VA','WA','WV','WI','WY','DC',
+].map((s) => ({ value: s, label: s }));
 
 const REFERRAL_OPTIONS = [
   { value: 'Google', label: 'Google' },
@@ -120,6 +127,7 @@ function getDefaultFormData(): IntakeFormData {
     updated_areas: [],
     other_improvements: '',
     mortgage_status: 'Has mortgage',
+    hoa_monthly_amount: undefined,
     flexible_on_price: false,
     customer_name: '',
     customer_email: '',
@@ -241,6 +249,7 @@ export default function IntakeForm({
       // Step 2 data
       if (stepReached >= 2) {
         payload.asking_price = form.asking_price;
+        payload.hoa_monthly_amount = form.hoa_monthly_amount;
       }
 
       // Step 3 data
@@ -417,11 +426,12 @@ export default function IntakeForm({
           error={errors.property_city}
           required
         />
-        <Input
+        <Select
           id="property_state"
           label="State"
-          value="FL"
-          disabled
+          value={form.property_state}
+          onChange={(e) => set('property_state', e.target.value)}
+          options={US_STATES}
         />
         <Input
           id="property_zip"
@@ -454,8 +464,11 @@ export default function IntakeForm({
         <Select
           id="baths"
           label="Bathrooms"
-          value={String(form.baths)}
-          onChange={(e) => set('baths', Number(e.target.value))}
+          value={form.baths >= 5.5 ? '5+' : String(form.baths)}
+          onChange={(e) => {
+            const val = e.target.value;
+            set('baths', val === '5+' ? 5.5 : Number(val));
+          }}
           options={BATHROOM_OPTIONS}
         />
       </div>
@@ -555,6 +568,16 @@ export default function IntakeForm({
         onChange={handlePriceChange}
         error={errors.asking_price}
         required
+      />
+
+      {/* HOA */}
+      <Input
+        id="hoa_monthly_amount"
+        label="Monthly HOA Fee (optional)"
+        type="number"
+        placeholder="e.g. 350"
+        value={form.hoa_monthly_amount || ''}
+        onChange={(e) => set('hoa_monthly_amount', e.target.value ? Number(e.target.value) : undefined)}
       />
 
       {/* Timeline */}

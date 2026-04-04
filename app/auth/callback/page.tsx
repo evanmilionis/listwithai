@@ -26,11 +26,12 @@ export default function AuthCallbackPage() {
       // Check for PKCE code in query params
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code');
+      const redirectTo = params.get('redirect') || '/dashboard';
 
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
-          router.replace('/dashboard');
+          router.replace(redirectTo);
           return;
         }
         console.error('Code exchange failed:', error);
@@ -49,7 +50,7 @@ export default function AuthCallbackPage() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
-        router.replace('/dashboard');
+        router.replace(redirectTo);
         return;
       }
 

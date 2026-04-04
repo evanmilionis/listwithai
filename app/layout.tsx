@@ -18,26 +18,26 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   metadataBase: new URL("https://listwithai.io"),
   title: {
-    default: "ListAI — Sell Your Florida Home Without an Agent | AI-Powered FSBO Toolkit",
+    default: "ListAI — Sell Your Home Without an Agent | AI-Powered FSBO Toolkit",
     template: "%s | ListAI",
   },
   description:
-    "Sell your Florida home and keep the commission. ListAI gives you AI-powered pricing analysis, professional listing copy, a selling timeline, legal templates, and market data — all for a flat $500. No agent needed.",
+    "Sell your home and keep the commission. ListAI gives you AI-powered pricing analysis, professional listing copy, a selling timeline, legal templates, and market data — all for just $100/mo. No agent needed.",
   keywords: [
-    "FSBO Florida",
-    "sell home without agent Florida",
-    "for sale by owner Florida",
-    "sell my house Florida",
-    "Florida FSBO toolkit",
+    "FSBO",
+    "sell home without agent",
+    "for sale by owner",
+    "sell my house",
+    "FSBO toolkit",
     "AI real estate",
     "AI home selling",
-    "flat fee MLS Florida",
-    "Florida home pricing",
-    "CMA Florida",
+    "flat fee MLS",
+    "home pricing",
+    "CMA",
     "sell home no commission",
-    "Florida real estate agent tools",
+    "real estate agent tools",
     "listing copy generator",
-    "home value Florida",
+    "home value",
     "ListAI",
     "listwithai",
   ],
@@ -45,9 +45,9 @@ export const metadata: Metadata = {
   creator: "ListAI",
   publisher: "ListAI",
   openGraph: {
-    title: "ListAI — Sell Your Florida Home. Keep the Commission.",
+    title: "ListAI — Sell Your Home. Keep the Commission.",
     description:
-      "AI-powered pricing analysis, listing copy, selling timeline, and legal templates — all for a flat $500. No agent commission.",
+      "AI-powered pricing analysis, listing copy, selling timeline, and legal templates — all for just $100/mo. No agent commission.",
     url: "https://listwithai.io",
     siteName: "ListAI",
     locale: "en_US",
@@ -57,15 +57,15 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "ListAI — AI-Powered Home Selling Toolkit for Florida",
+        alt: "ListAI — AI-Powered Home Selling Toolkit",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "ListAI — Sell Your Florida Home Without an Agent",
+    title: "ListAI — Sell Your Home Without an Agent",
     description:
-      "AI pricing, listing copy, timeline & legal docs for a flat $500. Keep your commission.",
+      "AI pricing, listing copy, timeline & legal docs for just $100/mo. Keep your commission.",
     images: ["/og-image.png"],
   },
   robots: {
@@ -93,12 +93,12 @@ const jsonLd = {
   operatingSystem: "Web",
   url: "https://listwithai.io",
   description:
-    "AI-powered home selling toolkit for Florida. Get pricing analysis, listing copy, selling timeline, and legal templates to sell your home without an agent.",
+    "AI-powered home selling toolkit. Get pricing analysis, listing copy, selling timeline, and legal templates to sell your home without an agent.",
   offers: {
     "@type": "Offer",
-    price: "500",
+    price: "100",
     priceCurrency: "USD",
-    description: "One-time flat fee for a complete AI home selling report",
+    description: "Monthly subscription for a complete AI home selling toolkit",
   },
   aggregateRating: undefined, // Add when you have reviews
   provider: {
@@ -107,12 +107,8 @@ const jsonLd = {
     url: "https://listwithai.io",
   },
   areaServed: {
-    "@type": "State",
-    name: "Florida",
-    containedInPlace: {
-      "@type": "Country",
-      name: "United States",
-    },
+    "@type": "Country",
+    name: "United States",
   },
 };
 

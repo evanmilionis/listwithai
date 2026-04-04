@@ -33,7 +33,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-xl font-semibold text-slate-900 mb-3">2. Description of Service</h2>
             <p>
-              ListAI provides AI-generated home selling reports for Florida properties. Our
+              ListAI provides AI-generated home selling reports for properties nationwide. Our
               reports include pricing analysis, listing copy, selling timeline, home improvement
               recommendations, and legal document templates. Reports are generated using
               artificial intelligence and third-party data sources.
@@ -59,7 +59,7 @@ export default function TermsPage() {
             <h2 className="text-xl font-semibold text-slate-900 mb-3">4. Pricing & Payment</h2>
             <ul className="list-disc pl-6 space-y-2">
               <li>
-                <strong>Homeowner Report</strong> — $500 one-time payment per property report.
+                <strong>Homeowner Report</strong> — $100/month subscription for property reports.
               </li>
               <li>
                 <strong>Agent Subscription</strong> — $150/month recurring subscription for
@@ -103,7 +103,7 @@ export default function TermsPage() {
               <li>Not resell, redistribute, or publicly display reports without permission.</li>
               <li>Consult licensed professionals before acting on report content.</li>
               <li>
-                Have legal templates reviewed by a Florida-licensed real estate attorney before
+                Have legal templates reviewed by a licensed real estate attorney before
                 use in any transaction.
               </li>
             </ul>
@@ -141,11 +141,11 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-slate-900 mb-3">11. Florida Law</h2>
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">11. Governing Law</h2>
             <p>
-              These Terms shall be governed by and construed in accordance with the laws of the
-              State of Florida, without regard to conflict of law principles. Any disputes shall
-              be resolved in the state or federal courts located in Florida.
+              These Terms shall be governed by and construed in accordance with applicable state law,
+              without regard to conflict of law principles. Any disputes shall
+              be resolved in the appropriate state or federal courts.
             </p>
           </section>
 
