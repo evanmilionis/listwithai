@@ -35,7 +35,7 @@ export async function sendReportReadyEmail(
             <li>Home improvement recommendations with ROI estimates</li>
             <li>Data-driven pricing analysis</li>
             <li>Professional listing copy</li>
-            <li>Florida legal document templates</li>
+            <li>State-specific legal document templates</li>
           </ul>
           <p style="color: #666; font-size: 14px;">If you have any questions, just reply to this email.</p>
           <p>— The ListAI Team</p>
@@ -99,7 +99,7 @@ export async function sendFollowupEmail(
       body: `
         <p>Hi ${name},</p>
         <p>When you're ready to go live, your report includes professionally written listing copy you can paste directly into the MLS, Zillow, or any listing platform.</p>
-        <p>It's tailored to your property and designed to attract the right Florida buyers.</p>
+        <p>It's tailored to your property and designed to attract the right buyers. Use the Virtual Staging tab to get AI-enhanced photos before you go live — great photos are the #1 factor in getting showings.</p>
         <p><a href="${reportUrl}">Grab your listing copy &rarr;</a></p>
       `,
     },
@@ -107,9 +107,20 @@ export async function sendFollowupEmail(
       subject: `Don't forget the legal side, ${name}`,
       body: `
         <p>Hi ${name},</p>
-        <p>Selling FSBO in Florida means handling your own paperwork. Your report includes template documents — seller's disclosure, purchase agreement, and more — plus guidance on when to involve a real estate attorney.</p>
+        <p>Selling FSBO means handling your own paperwork. Your report includes state-specific template documents — seller's disclosure, purchase agreement, and more — plus guidance on when to involve a real estate attorney.</p>
         <p>This is the stuff most FSBO sellers overlook. Don't let it catch you off guard.</p>
         <p><a href="${reportUrl}">Review your legal package &rarr;</a></p>
+      `,
+    },
+    6: {
+      subject: `Did you sell your home, ${name}? 🏡`,
+      body: `
+        <p>Hi ${name},</p>
+        <p>We saw you've been using your ListAI report for a while now — we hope your sale is going well!</p>
+        <p>If you've already sold (congrats!), we'd love to hear how it went. A quick testimonial helps other homeowners know ListAI is the real deal.</p>
+        <p><strong>How much did you save in agent commissions?</strong> Reply to this email with your story — even two sentences — and we'll feature it on our site.</p>
+        <p>And if you're still in the process, remember: your <strong>Offer Review</strong> tab in the report can help you analyze any offers you receive and know exactly what to counter.</p>
+        <p><a href="${reportUrl}">Open your report &rarr;</a></p>
       `,
     },
   };

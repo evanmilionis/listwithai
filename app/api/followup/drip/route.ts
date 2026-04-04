@@ -24,6 +24,7 @@ const DRIP_SCHEDULE: Record<number, number> = {
   3: 14,
   4: 21,
   5: 30,
+  6: 45,  // testimonial ask
 };
 
 export async function POST(request: NextRequest) {
@@ -49,7 +50,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('status', 'complete')
       .eq('customer_type', 'homeowner')
-      .lt('followup_stage', 5)
+      .lt('followup_stage', 6)
       .not('customer_email', 'is', null);
 
     if (error || !reports) {

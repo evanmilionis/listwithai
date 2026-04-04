@@ -30,6 +30,11 @@ import {
   Building,
   Megaphone,
   Sofa,
+  ClipboardCheck,
+  Loader2,
+  ThumbsUp,
+  ThumbsDown,
+  ArrowLeftRight,
 } from 'lucide-react';
 
 interface ReportViewerProps {
@@ -48,6 +53,7 @@ const TABS = [
   { key: 'mls', label: 'MLS', icon: MapPin },
   { key: 'attorneys', label: 'Attorneys', icon: Users },
   { key: 'staging', label: 'Virtual Staging', icon: Sofa },
+  { key: 'offer', label: 'Offer Review', icon: ClipboardCheck },
 ] as const;
 
 const AGENT_TABS = [
@@ -848,6 +854,329 @@ function EmptyTab({ message }: { message: string }) {
     <div className="rounded-xl border border-slate-200 bg-white p-12 text-center shadow-sm">
       <Clock className="h-8 w-8 text-slate-300 mx-auto mb-3" />
       <p className="text-sm text-slate-500">{message}</p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Offer Review Tab                                                   */
+/* ------------------------------------------------------------------ */
+interface OfferAnalysis {
+  verdict: 'accept' | 'counter' | 'reject';
+  verdict_reason: string;
+  strength_score: number;
+  red_flags: string[];
+  green_flags: string[];
+  counter_strategy: {
+    recommended_counter_price: number;
+    concessions_counter: number;
+    closing_date_notes: string;
+    contingency_notes: string;
+  };
+  negotiation_talking_points: string[];
+  bottom_line: string;
+}
+
+function OfferReviewTab({ report }: { report: Report }) {
+  const [form, setForm] = useState({
+    offerPrice: '',
+    downPayment: '20',
+    financingType: 'Conventional',
+    inspectionContingency: true,
+    financingContingency: true,
+    appraisalContingency: true,
+    closingDate: '',
+    earnestMoney: '',
+    sellerConcessions: '0',
+    notes: '',
+  });
+  const [loading, setLoading] = useState(false);
+  const [analysis, setAnalysis] = useState<OfferAnalysis | null>(null);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    setAnalysis(null);
+
+    try {
+      const res = await fetch('/api/report/analyze-offer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reportId: report.id,
+          offer: {
+            offerPrice: Number(form.offerPrice.replace(/,/g, '')),
+            downPayment: Number(form.downPayment),
+            financingType: form.financingType,
+            inspectionContingency: form.inspectionContingency,
+            financingContingency: form.financingContingency,
+            appraisalContingency: form.appraisalContingency,
+            closingDate: form.closingDate,
+            earnestMoney: Number(form.earnestMoney.replace(/,/g, '')),
+            sellerConcessions: Number(form.sellerConcessions.replace(/,/g, '')),
+            notes: form.notes,
+          },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      setAnalysis(data.analysis);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verdictStyles = {
+    accept: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', icon: ThumbsUp, label: 'Accept This Offer' },
+    counter: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', icon: ArrowLeftRight, label: 'Counter This Offer' },
+    reject: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', icon: ThumbsDown, label: 'Reject This Offer' },
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-1">
+          <ClipboardCheck className="h-5 w-5 text-slate-400" />
+          <h3 className="text-lg font-semibold text-slate-900">Analyze an Offer</h3>
+        </div>
+        <p className="text-sm text-slate-500 mb-6">
+          Enter the offer details and AI will tell you whether to accept, counter, or reject — with specific negotiation guidance.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Offer Price *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                <input
+                  type="text"
+                  required
+                  placeholder="450,000"
+                  value={form.offerPrice}
+                  onChange={e => setForm(f => ({ ...f, offerPrice: e.target.value }))}
+                  className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Earnest Money</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                <input
+                  type="text"
+                  placeholder="5,000"
+                  value={form.earnestMoney}
+                  onChange={e => setForm(f => ({ ...f, earnestMoney: e.target.value }))}
+                  className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Down Payment %</label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={form.downPayment}
+                onChange={e => setForm(f => ({ ...f, downPayment: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Financing Type</label>
+              <select
+                value={form.financingType}
+                onChange={e => setForm(f => ({ ...f, financingType: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+              >
+                <option>Conventional</option>
+                <option>FHA</option>
+                <option>VA</option>
+                <option>USDA</option>
+                <option>Cash</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Closing Date</label>
+              <input
+                type="date"
+                value={form.closingDate}
+                onChange={e => setForm(f => ({ ...f, closingDate: e.target.value }))}
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Seller Concessions Requested</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                <input
+                  type="text"
+                  placeholder="0"
+                  value={form.sellerConcessions}
+                  onChange={e => setForm(f => ({ ...f, sellerConcessions: e.target.value }))}
+                  className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-2">Contingencies</label>
+            <div className="flex flex-wrap gap-4">
+              {[
+                { key: 'inspectionContingency', label: 'Inspection' },
+                { key: 'financingContingency', label: 'Financing' },
+                { key: 'appraisalContingency', label: 'Appraisal' },
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form[key as keyof typeof form] as boolean}
+                    onChange={e => setForm(f => ({ ...f, [key]: e.target.checked }))}
+                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Additional Notes (inclusions, exclusions, special terms)</label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Buyer wants refrigerator included. Requested 60-day leaseback..."
+              value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+              className="w-full px-3 py-2.5 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 resize-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !form.offerPrice}
+            className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-semibold rounded-xl hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Analyzing offer...
+              </>
+            ) : (
+              <>
+                <ClipboardCheck className="h-4 w-4" />
+                Analyze This Offer
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {analysis && (() => {
+        const verdict = verdictStyles[analysis.verdict];
+        const VerdictIcon = verdict.icon;
+        return (
+          <div className="space-y-5">
+            {/* Verdict banner */}
+            <div className={cn('rounded-xl border p-5', verdict.bg, verdict.border)}>
+              <div className="flex items-center gap-3 mb-2">
+                <VerdictIcon className={cn('h-6 w-6', verdict.text)} />
+                <p className={cn('text-lg font-bold', verdict.text)}>{verdict.label}</p>
+                <span className="ml-auto text-sm font-medium text-slate-600">
+                  Offer strength: <span className="font-bold text-slate-900">{analysis.strength_score}/10</span>
+                </span>
+              </div>
+              <p className={cn('text-sm', verdict.text)}>{analysis.verdict_reason}</p>
+            </div>
+
+            {/* Bottom line */}
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Bottom Line</p>
+              <p className="text-sm text-slate-700 leading-relaxed">{analysis.bottom_line}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Green flags */}
+              {analysis.green_flags.length > 0 && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-5">
+                  <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-3">Positives</p>
+                  <ul className="space-y-2">
+                    {analysis.green_flags.map((flag, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-emerald-800">
+                        <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
+                        {flag}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {/* Red flags */}
+              {analysis.red_flags.length > 0 && (
+                <div className="rounded-xl border border-red-100 bg-red-50 p-5">
+                  <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-3">Red Flags</p>
+                  <ul className="space-y-2">
+                    {analysis.red_flags.map((flag, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-red-800">
+                        <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+                        {flag}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Counter strategy */}
+            {analysis.verdict === 'counter' && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-4">Counter Strategy</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center p-3 rounded-lg bg-slate-50">
+                    <p className="text-xs text-slate-500 mb-1">Counter Price</p>
+                    <p className="text-base font-bold text-slate-900">${analysis.counter_strategy.recommended_counter_price.toLocaleString()}</p>
+                  </div>
+                  <div className="text-center p-3 rounded-lg bg-slate-50">
+                    <p className="text-xs text-slate-500 mb-1">Concessions</p>
+                    <p className="text-base font-bold text-slate-900">${analysis.counter_strategy.concessions_counter.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="space-y-2 text-sm text-slate-600">
+                  <p><span className="font-medium">Closing Date:</span> {analysis.counter_strategy.closing_date_notes}</p>
+                  <p><span className="font-medium">Contingencies:</span> {analysis.counter_strategy.contingency_notes}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Negotiation talking points */}
+            {analysis.negotiation_talking_points.length > 0 && (
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Negotiation Talking Points</p>
+                <ul className="space-y-2">
+                  {analysis.negotiation_talking_points.map((point, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                      <ChevronRight className="h-4 w-4 text-slate-400 shrink-0 mt-0.5" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1657,6 +1986,8 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             stagingCredits={stagingCredits}
           />
         )}
+
+        {activeTab === 'offer' && <OfferReviewTab report={report} />}
       </div>
 
       {/* Support banner */}

@@ -201,14 +201,14 @@ export default function HomeownerDashboardPage() {
               </Link>
             )}
 
-            {report.status === 'failed' && (
+            {(report.status === 'complete' || report.status === 'failed') && (
               <button
                 onClick={handleRerun}
                 disabled={regenerating}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50"
               >
                 <RefreshCw className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} />
-                {regenerating ? 'Re-running...' : 'Re-run Report'}
+                {regenerating ? 'Re-running...' : 'Refresh Market Data'}
               </button>
             )}
 
