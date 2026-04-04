@@ -131,22 +131,8 @@ export default function RootLayout({
         {children}
         <CookieBanner />
         <Analytics />
-        {/* Tawk.to live chat */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
-              (function(){
-                var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
-                s1.async=true;
-                s1.src='https://embed.tawk.to/69d09ffc95fcef1c2fa79f2b/1jlbf1sea';
-                s1.charset='UTF-8';
-                s1.setAttribute('crossorigin','*');
-                s0.parentNode.insertBefore(s1,s0);
-              })();
-            `,
-          }}
-        />
+        {/* Tidio live chat */}
+        <script src="//code.tidio.co/6zzwdlmfpwkavqhkhrt81zt2rsqbensr.js" async />
       </body>
     </html>
   );
