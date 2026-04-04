@@ -855,6 +855,15 @@ function EmptyTab({ message }: { message: string }) {
 /* ------------------------------------------------------------------ */
 /*  Next Steps Panel                                                   */
 /* ------------------------------------------------------------------ */
+function formatStepDate(dateStr: string): string {
+  try {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      .format(new Date(dateStr + 'T00:00:00'));
+  } catch {
+    return dateStr;
+  }
+}
+
 function NextStepsPanel({ report }: { report: Report }) {
   const output = report.report_output;
   const pricing = output?.pricing as PricingModule | null | undefined;
@@ -866,53 +875,61 @@ function NextStepsPanel({ report }: { report: Report }) {
 
   // 1. Recommended list price
   if (pricing?.recommended_list_price) {
+    const range = pricing.price_range;
+    const rangeDetail = range
+      ? `Price range: $${range.aggressive.toLocaleString()} – $${range.conservative.toLocaleString()}. See the Pricing tab for your full strategy.`
+      : `Based on comparable sales in ${report.property_city}. See the Pricing tab for details.`;
     steps.push({
       label: `List your home at $${pricing.recommended_list_price.toLocaleString()}`,
-      detail: pricing.pricing_strategy
-        ? pricing.pricing_strategy.split('.')[0] + '.'
-        : `Based on comparable sales in ${report.property_city}.`,
+      detail: rangeDetail,
     });
   }
 
   // 2. Target list date
   if (timeline?.recommended_list_date) {
     steps.push({
-      label: `Target list date: ${timeline.recommended_list_date}`,
-      detail: timeline.timeline_summary
-        ? timeline.timeline_summary.split('.')[0] + '.'
-        : 'See your full timeline for week-by-week tasks.',
+      label: `Target list date: ${formatStepDate(timeline.recommended_list_date)}`,
+      detail: timeline.timeline_summary || 'See your full timeline for a week-by-week action plan.',
     });
   }
 
-  // 3. Top improvement
-  const topImprovement = improvements?.recommendations?.[0];
+  // 3. Top improvement — skip any "Pricing Strategy" items the AI may put in improvements
+  const topImprovement = improvements?.recommendations?.find(
+    (r) => !r.area.toLowerCase().includes('pric')
+  ) ?? improvements?.recommendations?.[0];
   if (topImprovement) {
     steps.push({
-      label: `${topImprovement.area}: ${topImprovement.recommendation}`,
-      detail: `Est. cost ${topImprovement.estimated_cost} · Est. ROI ${topImprovement.estimated_roi}`,
+      label: `Improvement: ${topImprovement.area} — ${topImprovement.recommendation}`,
+      detail: `Est. cost ${topImprovement.estimated_cost} · Est. ROI ${topImprovement.estimated_roi}. ${topImprovement.diy_friendly ? 'DIY-friendly.' : 'Hire a contractor.'}`,
     });
   }
 
-  // 4. First required document
-  const firstDoc = legal?.required_documents?.[0];
-  if (firstDoc) {
-    steps.push({
-      label: `Gather: ${firstDoc.document_name}`,
-      detail: firstDoc.description,
-    });
-  }
+  // 4. Get on the MLS
+  steps.push({
+    label: 'List on the MLS without an agent for under $300',
+    detail: 'Use a flat-fee MLS service like Houzeo or ListWithFreedom. They put your home on Zillow, Realtor.com, and your local MLS. See the MLS tab.',
+  });
 
   // 5. Hire an attorney
   steps.push({
     label: 'Hire a real estate attorney before signing anything',
-    detail: 'Check the Attorneys tab for options near you. Have them review all contracts.',
+    detail: 'Have them review all contracts and disclosures. See the Attorneys tab for options near you.',
   });
 
-  // 6. Use the listing copy
+  // 6. First required document
+  const firstDoc = legal?.required_documents?.[0];
+  if (firstDoc?.document_name) {
+    steps.push({
+      label: `Gather: ${firstDoc.document_name}`,
+      detail: firstDoc.description || 'Required for your sale. See the Legal tab for the full documents list.',
+    });
+  }
+
+  // 7. Use the listing copy
   if (output?.listing) {
     steps.push({
       label: 'Copy your AI-written listing headline & description',
-      detail: 'Find it in the Listing Copy tab. Use it on Zillow, Realtor.com, and any other platform.',
+      detail: 'Find it in the Listing Copy tab. Paste it into Zillow, Realtor.com, Houzeo, or any platform.',
     });
   }
 
