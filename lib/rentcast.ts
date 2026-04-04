@@ -30,7 +30,8 @@ export async function fetchPropertyRecords(
     });
 
     if (!res.ok) {
-      console.error(`Rentcast properties error: ${res.status} ${res.statusText}`);
+      const body = await res.text().catch(() => '');
+      console.error(`Rentcast properties error: ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
       return null;
     }
 
@@ -74,7 +75,8 @@ export async function fetchValueEstimate(
     });
 
     if (!res.ok) {
-      console.error(`Rentcast valuation error: ${res.status} ${res.statusText}`);
+      const body = await res.text().catch(() => '');
+      console.error(`Rentcast valuation error: ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
       return null;
     }
 
@@ -103,7 +105,8 @@ export async function fetchMarketStats(
     });
 
     if (!res.ok) {
-      console.error(`Rentcast market error: ${res.status} ${res.statusText}`);
+      const body = await res.text().catch(() => '');
+      console.error(`Rentcast market error: ${res.status} ${res.statusText} — ${body.substring(0, 200)}`);
       return null;
     }
 

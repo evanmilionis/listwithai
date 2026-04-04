@@ -223,54 +223,61 @@ function SellingTimeline({ report }: { report: Report }) {
             <p className="text-sm font-semibold text-slate-900">{tl.estimated_close_date}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs text-slate-500 font-medium">Total Weeks</p>
-            <p className="text-sm font-semibold text-slate-900">{tl.weeks.length} weeks</p>
+            <p className="text-xs text-slate-500 font-medium">{tl.phases ? 'Phases' : 'Total Weeks'}</p>
+            <p className="text-sm font-semibold text-slate-900">{(tl.phases ?? tl.weeks ?? []).length} {tl.phases ? 'phases' : 'weeks'}</p>
           </div>
         </div>
       </div>
 
-      {/* Week-by-week */}
+      {/* Phase-based (new) or week-by-week (legacy) */}
       <div className="space-y-4">
-        {tl.weeks.map((week) => (
-          <div
-            key={week.week_number}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-white">
-                {week.week_number}
-              </span>
-              <h4 className="text-sm font-semibold text-slate-900">{week.label}</h4>
+        {(tl.phases ?? tl.weeks ?? []).map((item) => {
+          const num = 'phase_number' in item ? item.phase_number : (item as { week_number: number }).week_number;
+          const duration = 'duration' in item ? (item as { duration: string }).duration : null;
+          return (
+            <div
+              key={num}
+              className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-navy-800 text-xs font-bold text-white">
+                  {num}
+                </span>
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">{item.label}</h4>
+                  {duration && <p className="text-xs text-slate-500">{duration}</p>}
+                </div>
+              </div>
+              <ul className="space-y-2">
+                {item.tasks.map((task, i) => (
+                  <li
+                    key={i}
+                    className="flex items-start gap-3 rounded-lg bg-slate-50 p-3"
+                  >
+                    <PriorityBadge priority={task.priority} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900">{task.task}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
+                    </div>
+                    <span className="flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap">
+                      <Clock className="h-3 w-3" />
+                      {task.estimated_hours}h
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="space-y-2">
-              {week.tasks.map((task, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 rounded-lg bg-slate-50 p-3"
-                >
-                  <PriorityBadge priority={task.priority} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{task.task}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{task.description}</p>
-                  </div>
-                  <span className="flex items-center gap-1 text-xs text-slate-400 whitespace-nowrap">
-                    <Clock className="h-3 w-3" />
-                    {task.estimated_hours}h
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Florida tips */}
-      {tl.florida_specific_tips.length > 0 && (
+      {(tl.florida_specific_tips ?? []).length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide">
             Florida-Specific Tips
           </h3>
-          {tl.florida_specific_tips.map((tip, i) => (
+          {(tl.florida_specific_tips ?? []).map((tip, i) => (
             <div
               key={i}
               className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
@@ -300,7 +307,7 @@ function ImprovementRecommendations({ report }: { report: Report }) {
   const imp = report.report_output?.improvements;
   if (!imp) return <EmptyTab message="Improvement data is not yet available." />;
 
-  const sorted = [...imp.recommendations].sort((a, b) => a.priority - b.priority);
+  const sorted = [...(imp.recommendations ?? [])].sort((a, b) => a.priority - b.priority);
 
   return (
     <div className="space-y-6">
@@ -353,13 +360,13 @@ function ImprovementRecommendations({ report }: { report: Report }) {
       </div>
 
       {/* Things to avoid */}
-      {imp.things_to_avoid.length > 0 && (
+      {(imp.things_to_avoid ?? []).length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-red-700 uppercase tracking-wide flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
             Things to Avoid
           </h3>
-          {imp.things_to_avoid.map((item, i) => (
+          {(imp.things_to_avoid ?? []).map((item, i) => (
             <div
               key={i}
               className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-4"
@@ -372,12 +379,12 @@ function ImprovementRecommendations({ report }: { report: Report }) {
       )}
 
       {/* Florida staging tips */}
-      {imp.florida_staging_tips.length > 0 && (
+      {(imp.florida_staging_tips ?? []).length > 0 && (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide">
             Florida Staging Tips
           </h3>
-          {imp.florida_staging_tips.map((tip, i) => (
+          {(imp.florida_staging_tips ?? []).map((tip, i) => (
             <div
               key={i}
               className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4"
@@ -486,7 +493,7 @@ function PricingAnalysis({ report }: { report: Report }) {
       )}
 
       {/* Comps table */}
-      {pr.comparable_analysis.length > 0 && (
+      {(pr.comparable_analysis ?? []).length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-navy-800">Comparable Sales</h3>
@@ -508,7 +515,7 @@ function PricingAnalysis({ report }: { report: Report }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {pr.comparable_analysis.map((comp, i) => (
+                {(pr.comparable_analysis ?? []).map((comp, i) => (
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-medium text-slate-900 whitespace-nowrap">{comp.address}</td>
                     <td className="px-4 py-3 text-slate-700">{formatCurrency(comp.sale_price)}</td>
@@ -529,14 +536,14 @@ function PricingAnalysis({ report }: { report: Report }) {
       )}
 
       {/* Price reduction triggers */}
-      {pr.price_reduction_triggers.length > 0 && (
+      {(pr.price_reduction_triggers ?? []).length > 0 && (
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-navy-800 mb-3 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-500" />
             Price Reduction Triggers
           </h3>
           <ol className="space-y-2">
-            {pr.price_reduction_triggers.map((trigger, i) => (
+            {(pr.price_reduction_triggers ?? []).map((trigger, i) => (
               <li
                 key={i}
                 className="flex items-start gap-3 text-sm text-slate-600"
@@ -591,10 +598,10 @@ function ListingCopy({ report }: { report: Report }) {
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide">Bullet Highlights</h3>
-          <CopyButton text={listing.bullet_highlights.join('\n')} />
+          <CopyButton text={(listing.bullet_highlights ?? []).join('\n')} />
         </div>
         <ul className="space-y-2">
-          {listing.bullet_highlights.map((bullet, i) => (
+          {(listing.bullet_highlights ?? []).map((bullet, i) => (
             <li key={i} className="flex items-start gap-2 text-sm text-slate-600">
               <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
               {bullet}
@@ -616,7 +623,7 @@ function ListingCopy({ report }: { report: Report }) {
       <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
         <h3 className="text-sm font-semibold text-navy-800 uppercase tracking-wide mb-3">SEO Keywords</h3>
         <div className="flex flex-wrap gap-2">
-          {listing.seo_keywords.map((kw, i) => (
+          {(listing.seo_keywords ?? []).map((kw, i) => (
             <span
               key={i}
               className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
@@ -660,7 +667,7 @@ function LegalPackage({ report }: { report: Report }) {
       <Disclaimer variant="banner" />
 
       {/* Documents */}
-      {legal.documents.map((doc, i) => (
+      {(legal.documents ?? []).map((doc, i) => (
         <ExpandableDocument key={i} doc={doc} />
       ))}
 
@@ -958,11 +965,14 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       html += `<div class="grid">`;
       html += `<div class="grid-item"><dt>List Date</dt><dd>${tl.recommended_list_date}</dd></div>`;
       html += `<div class="grid-item"><dt>Est. Close</dt><dd>${tl.estimated_close_date}</dd></div>`;
-      html += `<div class="grid-item"><dt>Total Weeks</dt><dd>${tl.weeks.length}</dd></div>`;
+      const items = tl.phases ?? tl.weeks ?? [];
+      html += `<div class="grid-item"><dt>${tl.phases ? 'Phases' : 'Total Weeks'}</dt><dd>${items.length}</dd></div>`;
       html += `</div>`;
-      tl.weeks.forEach(week => {
-        html += `<div class="card"><div class="week-header"><span class="week-num">${week.week_number}</span><strong>${week.label}</strong></div>`;
-        week.tasks.forEach(task => {
+      items.forEach((item) => {
+        const num = 'phase_number' in item ? item.phase_number : (item as { week_number: number }).week_number;
+        const duration = 'duration' in item ? ` (${(item as { duration: string }).duration})` : '';
+        html += `<div class="card"><div class="week-header"><span class="week-num">${num}</span><strong>${item.label}${duration}</strong></div>`;
+        item.tasks.forEach(task => {
           html += `<p><span class="badge badge-${task.priority}">${task.priority}</span> <strong>${task.task}</strong> — ${task.description} <em>(${task.estimated_hours}h)</em></p>`;
         });
         html += `</div>`;
@@ -1169,11 +1179,11 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Instagram Caption</p>
-                <CopyButton text={socialMedia.instagram_caption + '\n\n' + socialMedia.instagram_hashtags.join(' ')} label="Copy" />
+                <CopyButton text={socialMedia.instagram_caption + '\n\n' + (socialMedia.instagram_hashtags ?? []).join(' ')} label="Copy" />
               </div>
               <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">{socialMedia.instagram_caption}</p>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {socialMedia.instagram_hashtags.map((tag, i) => (
+                {(socialMedia.instagram_hashtags ?? []).map((tag, i) => (
                   <span key={i} className="text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">#{tag.replace('#', '')}</span>
                 ))}
               </div>
@@ -1238,7 +1248,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Property Highlights</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {buyerCMA.property_highlights.map((h, i) => (
+                {(buyerCMA.property_highlights ?? []).map((h, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
                     <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
                     <span>{h}</span>
@@ -1251,10 +1261,10 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Comparable Sales Analysis</p>
-                <CopyButton text={buyerCMA.comparable_sales.map(c => `${c.address} - $${c.sale_price.toLocaleString()} (${c.condition_comparison})`).join('\n')} label="Copy" />
+                <CopyButton text={(buyerCMA.comparable_sales ?? []).map(c => `${c.address} - $${c.sale_price.toLocaleString()} (${c.condition_comparison})`).join('\n')} label="Copy" />
               </div>
               <div className="space-y-4">
-                {buyerCMA.comparable_sales.map((comp, i) => (
+                {(buyerCMA.comparable_sales ?? []).map((comp, i) => (
                   <div key={i} className="border border-slate-100 rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-sm font-medium text-slate-900">{comp.address}</p>
@@ -1299,7 +1309,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Neighborhood Highlights</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {buyerCMA.neighborhood_highlights.map((h, i) => (
+                {(buyerCMA.neighborhood_highlights ?? []).map((h, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
                     <MapPin className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
                     <span>{h}</span>
@@ -1325,7 +1335,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Feature Highlights</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {openHouse.feature_highlights.map((f, i) => (
+                {(openHouse.feature_highlights ?? []).map((f, i) => (
                   <div key={i} className="flex items-start gap-2 text-sm text-slate-700">
                     <Star className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
                     <span>{f}</span>
@@ -1344,10 +1354,10 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Agent Talking Points</p>
-                <CopyButton text={openHouse.agent_talking_points.join('\n• ')} label="Copy" />
+                <CopyButton text={(openHouse.agent_talking_points ?? []).join('\n• ')} label="Copy" />
               </div>
               <ul className="space-y-2">
-                {openHouse.agent_talking_points.map((point, i) => (
+                {(openHouse.agent_talking_points ?? []).map((point, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
                     <ChevronRight className="h-4 w-4 text-slate-400 mt-0.5 flex-shrink-0" />
                     <span>{point}</span>
@@ -1360,7 +1370,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Objection Handlers</p>
               <div className="space-y-4">
-                {openHouse.objection_handlers.map((obj, i) => (
+                {(openHouse.objection_handlers ?? []).map((obj, i) => (
                   <div key={i} className="border-l-2 border-amber-300 pl-4">
                     <p className="text-sm font-medium text-slate-900">&ldquo;{obj.objection}&rdquo;</p>
                     <p className="text-sm text-slate-600 mt-1">{obj.response}</p>
@@ -1437,7 +1447,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Key Market Insights</p>
               <ul className="space-y-2">
-                {marketSnapshot.key_insights.map((insight, i) => (
+                {(marketSnapshot.key_insights ?? []).map((insight, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
                     <TrendingUp className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
                     <span>{insight}</span>

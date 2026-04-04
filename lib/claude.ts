@@ -35,18 +35,20 @@ function getAnthropic(): Anthropic {
 
 const MODEL = 'claude-sonnet-4-6';
 
-// Per-module token ceilings — sized to what each module actually needs.
-// Cuts wasteful reserved-but-unused tokens billed on every call.
+// Per-module token ceilings.
+// These are starting limits — callClaude() auto-bumps by 50% on truncation.
+// Note: max_tokens only charges for tokens actually GENERATED, not reserved,
+// so setting these a bit higher than needed has zero cost impact.
 const MODULE_MAX_TOKENS = {
-  timeline:       8192,
-  improvements:   8192,
-  pricing:        8192,
-  listingCopy:    6000,
+  timeline:       12000,
+  improvements:   10000,
+  pricing:        10000,
+  listingCopy:    8192,
   legal:          12000,
-  socialMedia:    6000,
-  buyerCMA:       8192,
-  openHouse:      6000,
-  marketSnapshot: 6000,
+  socialMedia:    8192,
+  buyerCMA:       10000,
+  openHouse:      8192,
+  marketSnapshot: 8192,
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -63,30 +65,32 @@ export interface PropertyContext {
   text: string;
 }
 
-/** Trim Rentcast payload to only the fields Claude actually uses */
+/** Trim Rentcast payload to only the fields Claude actually uses.
+ *  Returns a safe object even when all Rentcast endpoints returned null. */
 function trimRentcast(r: RentcastData) {
   return {
-    estimatedValue: r.valuation?.price,
-    priceRangeLow:  r.valuation?.priceLow,
-    priceRangeHigh: r.valuation?.priceHigh,
-    yearBuilt:      r.property?.yearBuilt,
+    estimatedValue: r.valuation?.price ?? null,
+    priceRangeLow:  r.valuation?.priceLow ?? null,
+    priceRangeHigh: r.valuation?.priceHigh ?? null,
+    yearBuilt:      r.property?.yearBuilt ?? null,
     comps: (r.valuation?.comparables ?? []).slice(0, 5).map((c) => ({
       address:    c.formattedAddress ?? c.addressLine1 ?? 'Unknown',
-      price:      c.price ?? c.lastSalePrice,
-      sqft:       c.squareFootage,
-      beds:       c.bedrooms,
-      baths:      c.bathrooms,
-      soldDate:   c.lastSaleDate,
-      dom:        c.daysOnMarket,
-      distanceMi: c.distance,
+      price:      c.price ?? c.lastSalePrice ?? null,
+      sqft:       c.squareFootage ?? null,
+      beds:       c.bedrooms ?? null,
+      baths:      c.bathrooms ?? null,
+      soldDate:   c.lastSaleDate ?? null,
+      dom:        c.daysOnMarket ?? null,
+      distanceMi: c.distance ?? null,
     })),
     market: {
-      medianDom:        r.market?.medianDaysOnMarket,
-      averagePrice:     r.market?.averagePrice,
-      avgPricePerSqft:  r.market?.averagePricePerSquareFoot,
-      activeListings:   r.market?.activeListingCount,
-      saleToListRatio:  r.market?.saleToListPriceRatio,
+      medianDom:        r.market?.medianDaysOnMarket ?? null,
+      averagePrice:     r.market?.averagePrice ?? null,
+      avgPricePerSqft:  r.market?.averagePricePerSquareFoot ?? null,
+      activeListings:   r.market?.activeListingCount ?? null,
+      saleToListRatio:  r.market?.saleToListPriceRatio ?? null,
     },
+    _dataAvailable: !!(r.valuation || r.market),
   };
 }
 
@@ -117,6 +121,9 @@ export function buildPropertyContext(
   // Extract form metadata if stored in report_output
   const formMeta = (report.report_output as unknown as Record<string, unknown>)?.form_metadata as Record<string, unknown> | undefined;
 
+  const trimmedRentcast = trimRentcast(rentcastData);
+  const trimmedAmenities = trimAmenities(amenities);
+
   const text = JSON.stringify({
     property: {
       address:      `${report.property_address}, ${report.property_city}, ${report.property_state} ${report.property_zip}`,
@@ -140,8 +147,15 @@ export function buildPropertyContext(
         flexibleOnPrice: formMeta.flexible_on_price,
       } : {}),
     },
-    rentcast:   trimRentcast(rentcastData),
-    amenities:  trimAmenities(amenities),
+    rentcast:   trimmedRentcast,
+    amenities:  trimmedAmenities,
+    // Tell Claude explicitly when external data is missing so it adapts
+    _dataFlags: {
+      hasValuation: !!rentcastData.valuation,
+      hasComps:     (rentcastData.valuation?.comparables?.length ?? 0) > 0,
+      hasMarket:    !!rentcastData.market,
+      hasAmenities: !!amenities,
+    },
     today:      new Date().toISOString().split('T')[0],
   }, null, 0); // no pretty-print — saves tokens
 
@@ -156,7 +170,8 @@ async function callClaude(
   systemPrompt: string,
   propertyContext: PropertyContext,
   modulePrompt: string,
-  maxTokens: number
+  maxTokens: number,
+  moduleName: string = 'unknown'
 ): Promise<unknown | null> {
   const anthropic = getAnthropic();
 
@@ -170,7 +185,7 @@ async function callClaude(
         system: [
           {
             type: 'text',
-            text: systemPrompt + '\n\nIMPORTANT: Return ONLY raw JSON. Do NOT wrap in markdown code blocks. Do NOT use ```json. Start your response with { and end with }.',
+            text: systemPrompt + '\n\nIMPORTANT: Return ONLY raw JSON. Do NOT wrap in markdown code blocks. Do NOT use ```json. Start your response with { and end with }. Keep your total response under 8000 characters. Be concise in all string values — favor clarity over length.',
             cache_control: { type: 'ephemeral' },
           },
         ],
@@ -195,19 +210,60 @@ async function callClaude(
         ],
       });
 
+      // Check for refusal or empty response
+      if (message.stop_reason === 'end_turn' && message.content.length === 0) {
+        console.error(`[${moduleName}] attempt ${attempt + 1}: empty response from Claude`);
+        continue;
+      }
+
       const textBlock = message.content.find((b) => b.type === 'text');
-      if (!textBlock || textBlock.type !== 'text') return null;
+      if (!textBlock || textBlock.type !== 'text') {
+        console.error(`[${moduleName}] attempt ${attempt + 1}: no text block in response. stop_reason=${message.stop_reason}`);
+        continue;
+      }
+
+      // ── Truncation detection ──────────────────────────────────────
+      // If stop_reason is 'max_tokens', the JSON is incomplete — parsing
+      // will always fail. Retry with a higher ceiling and a "be concise"
+      // nudge so the model fits within the limit.
+      if (message.stop_reason === 'max_tokens') {
+        console.warn(`[${moduleName}] attempt ${attempt + 1}: TRUNCATED (hit max_tokens=${maxTokens}, output=${textBlock.text.length} chars). Retrying with +50% tokens and conciseness nudge.`);
+        // Bump limit by 50% for the next attempt (capped at 16384)
+        maxTokens = Math.min(Math.ceil(maxTokens * 1.5), 16384);
+        // Append conciseness instruction for next attempt
+        if (!modulePrompt.includes('TOKEN BUDGET WARNING')) {
+          modulePrompt += '\n\nTOKEN BUDGET WARNING: Your previous response was too long and got cut off. Be MORE CONCISE. Use shorter descriptions. Limit each task description to 1-2 sentences. Do NOT sacrifice required JSON fields — just use fewer words in string values.';
+        }
+        continue;
+      }
 
       const parsed = extractJSON(textBlock.text);
       if (parsed) return parsed;
 
-      console.error(`Claude attempt ${attempt + 1}: could not parse JSON. First 300 chars:`, textBlock.text.substring(0, 300));
-      console.error(`Claude attempt ${attempt + 1}: last 200 chars:`, textBlock.text.substring(textBlock.text.length - 200));
-    } catch (error) {
-      console.error(`Claude attempt ${attempt + 1} error:`, error);
+      console.error(`[${moduleName}] attempt ${attempt + 1}: JSON parse failed. stop_reason=${message.stop_reason}, length=${textBlock.text.length}`);
+      console.error(`[${moduleName}] first 300 chars:`, textBlock.text.substring(0, 300));
+      console.error(`[${moduleName}] last 200 chars:`, textBlock.text.substring(textBlock.text.length - 200));
+    } catch (error: unknown) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const statusCode = (error as { status?: number })?.status;
+      console.error(`[${moduleName}] attempt ${attempt + 1} error (status=${statusCode}): ${errMsg}`);
+
+      // Don't retry on auth/model errors — they won't resolve
+      if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
+        console.error(`[${moduleName}] non-retryable error (${statusCode}), aborting`);
+        return null;
+      }
+
+      // Back off before retry on rate limits
+      if (statusCode === 429 && attempt < 2) {
+        const wait = (attempt + 1) * 2000;
+        console.log(`[${moduleName}] rate limited, waiting ${wait}ms before retry`);
+        await new Promise(resolve => setTimeout(resolve, wait));
+      }
     }
   }
 
+  console.error(`[${moduleName}] all 3 attempts failed`);
   return null;
 }
 
@@ -268,22 +324,33 @@ export async function generateTimeline(
   const system =
     'You are an expert Florida real estate consultant creating a personalized home selling timeline. Be specific, practical, and Florida-market aware. Format output as structured JSON.';
 
-  const prompt = `Using the property context above, create a detailed week-by-week FSBO selling timeline.
+  const prompt = `Using the property context above, create a FSBO selling timeline organized by phase (not individual weeks).
+
+Note: Check _dataFlags — if market data is unavailable, use your knowledge of Florida market norms for timeline estimates.
+
+STRICT OUTPUT CONSTRAINTS:
+- Use 4-6 phases (e.g., "Pre-Listing Prep", "Active Marketing", "Offer & Negotiation", "Under Contract", "Closing"), NOT individual weeks
+- Each phase: 3-5 tasks MAX
+- Each task description: 1-2 sentences MAX (under 30 words)
+- timeline_summary: 2-3 sentences MAX
+- florida_specific_tips: exactly 4 tips
+- Keep total response under 3000 words
 
 Return JSON with this exact structure:
 {
-  "timeline_summary": "string",
+  "timeline_summary": "string (2-3 sentences)",
   "recommended_list_date": "YYYY-MM-DD",
   "recommended_list_day": "string",
   "estimated_close_date": "YYYY-MM-DD",
-  "weeks": [
+  "phases": [
     {
-      "week_number": 1,
-      "label": "string",
+      "phase_number": 1,
+      "label": "string (e.g. Pre-Listing Prep)",
+      "duration": "string (e.g. Weeks 1-2)",
       "tasks": [
         {
-          "task": "string",
-          "description": "string",
+          "task": "string (short action item)",
+          "description": "string (1-2 sentences, under 30 words)",
           "priority": "high|medium|low",
           "estimated_hours": 0
         }
@@ -294,7 +361,7 @@ Return JSON with this exact structure:
   "seasonal_note": "string"
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.timeline)) as TimelineModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.timeline, 'timeline')) as TimelineModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -311,18 +378,25 @@ export async function generateImprovements(
 
   const prompt = `Using the property context above, recommend specific improvements to maximize sale price.
 
-IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Acknowledge what the seller has already done, estimate how those improvements affect value, and adjust your recommendations accordingly. Do NOT recommend improvements the seller has already completed.
+IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Acknowledge what the seller has already done and do NOT recommend improvements already completed.
+
+STRICT OUTPUT CONSTRAINTS:
+- summary: 2-3 sentences MAX
+- recommendations: exactly 5-7 items (not more)
+- Each "recommendation", "why" field: 1 sentence MAX
+- things_to_avoid: exactly 3-4 items, 1 sentence each
+- florida_staging_tips: exactly 3-4 items, 1 sentence each
 
 Return JSON with this exact structure:
 {
-  "summary": "string",
+  "summary": "string (2-3 sentences)",
   "total_estimated_investment": "string",
   "potential_value_increase": "string",
   "recommendations": [
     {
       "area": "string",
-      "recommendation": "string",
-      "why": "string",
+      "recommendation": "string (1 sentence)",
+      "why": "string (1 sentence)",
       "estimated_cost": "string",
       "estimated_roi": "string",
       "priority": 1,
@@ -330,11 +404,11 @@ Return JSON with this exact structure:
       "time_to_complete": "string"
     }
   ],
-  "things_to_avoid": ["string"],
-  "florida_staging_tips": ["string"]
+  "things_to_avoid": ["string (1 sentence each, 3-4 items)"],
+  "florida_staging_tips": ["string (1 sentence each, 3-4 items)"]
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.improvements)) as ImprovementsModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.improvements, 'improvements')) as ImprovementsModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -349,19 +423,32 @@ export async function generatePricingAnalysis(
   const system =
     'You are a Florida real estate pricing expert with deep knowledge of CMA (Comparative Market Analysis). Provide specific, data-driven pricing guidance based on real comp data.';
 
-  const prompt = `Using the property context above (which includes comp sales and market data), perform a Comparative Market Analysis for this Florida FSBO property.
+  const prompt = `Using the property context above, perform a Comparative Market Analysis for this Florida FSBO property.
+
+IMPORTANT: Check the _dataFlags in the context. If hasComps or hasMarket is false, the external market data API was unavailable. In that case:
+- Use the seller's asking price and your knowledge of the Florida market.
+- Note in pricing_summary that comp data was limited.
+- Do NOT fabricate comparable sales — leave comparable_analysis as an empty array.
+
+STRICT OUTPUT CONSTRAINTS:
+- pricing_summary: 2-3 sentences MAX
+- owner_price_assessment: 1-2 sentences
+- pricing_strategy: 2-3 sentences MAX
+- comparable_analysis: MAX 5 comps. "relevance" field: 1 sentence each
+- florida_market_context: 2-3 sentences MAX
+- price_reduction_triggers: exactly 3-4 items, 1 sentence each
 
 Return JSON with this exact structure:
 {
-  "pricing_summary": "string",
+  "pricing_summary": "string (2-3 sentences)",
   "recommended_list_price": 0,
   "price_range": { "aggressive": 0, "conservative": 0 },
   "price_per_sqft": 0,
   "market_avg_ppsf": 0,
-  "owner_price_assessment": "string",
+  "owner_price_assessment": "string (1-2 sentences)",
   "days_on_market_prediction": "string",
   "negotiation_floor": 0,
-  "pricing_strategy": "string",
+  "pricing_strategy": "string (2-3 sentences)",
   "comparable_analysis": [
     {
       "address": "string",
@@ -373,14 +460,14 @@ Return JSON with this exact structure:
       "sale_date": "string",
       "dom": 0,
       "distance": "string",
-      "relevance": "string"
+      "relevance": "string (1 sentence)"
     }
   ],
-  "florida_market_context": "string",
-  "price_reduction_triggers": ["string"]
+  "florida_market_context": "string (2-3 sentences)",
+  "price_reduction_triggers": ["string (1 sentence each, 3-4 items)"]
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.pricing)) as PricingModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.pricing, 'pricing')) as PricingModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -398,20 +485,29 @@ export async function generateListingCopy(
 
   const prompt = `Using the property context above (which includes amenity data), write compelling listing copy for this Florida FSBO property.
 
+STRICT OUTPUT CONSTRAINTS:
+- headline: under 15 words
+- full_description: 200-250 words MAX (not 350)
+- short_description: 50-75 words
+- bullet_highlights: exactly 8 items, each under 10 words
+- seo_keywords: exactly 6 keywords
+- buyer_persona_targeted: 1 sentence
+- florida_lifestyle_angle: 1-2 sentences
+
 Return JSON with this exact structure:
 {
-  "headline": "string",
+  "headline": "string (under 15 words)",
   "tagline": "string",
-  "full_description": "string (250-350 words)",
+  "full_description": "string (200-250 words MAX)",
   "short_description": "string (50-75 words)",
-  "bullet_highlights": ["string (8-10 items)"],
-  "open_house_description": "string",
-  "seo_keywords": ["string"],
-  "buyer_persona_targeted": "string",
-  "florida_lifestyle_angle": "string"
+  "bullet_highlights": ["string (exactly 8 items, under 10 words each)"],
+  "open_house_description": "string (2-3 sentences)",
+  "seo_keywords": ["string (exactly 6)"],
+  "buyer_persona_targeted": "string (1 sentence)",
+  "florida_lifestyle_angle": "string (1-2 sentences)"
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.listingCopy)) as ListingModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.listingCopy, 'listing')) as ListingModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -464,7 +560,7 @@ Return JSON with this exact structure:
   }
 }`;
 
-  const advisory = await callClaude(system, ctx, prompt, 1500) as {
+  const advisory = await callClaude(system, ctx, prompt, 1500, 'legal') as {
     key_clauses_explained: { clause: string; plain_english: string }[];
     florida_attorney_referral: {
       intro: string;
@@ -514,18 +610,27 @@ export async function generateSocialMedia(
 
   const prompt = `Using the property context above, create social media marketing content for this listing.
 
+STRICT OUTPUT CONSTRAINTS:
+- instagram_caption: 100-150 words MAX
+- instagram_hashtags: exactly 10 hashtags
+- facebook_post: 80-100 words MAX
+- twitter_post: under 280 characters
+- linkedin_post: 80-100 words MAX
+- short_form_video_script: 100 words MAX
+- email_blast: 100-150 words MAX
+
 Return JSON with this exact structure:
 {
-  "instagram_caption": "string (engaging, emoji-friendly, 150-200 words with line breaks)",
-  "instagram_hashtags": ["string (15-20 relevant hashtags)"],
-  "facebook_post": "string (conversational, 100-150 words, designed for engagement)",
-  "twitter_post": "string (under 280 characters, punchy)",
-  "linkedin_post": "string (professional tone, 100-150 words, targets investors/relocators)",
-  "short_form_video_script": "string (30-60 second script for Reels/TikTok with shot directions)",
-  "email_blast": "string (HTML-friendly email body, 150-200 words, with clear CTA)"
+  "instagram_caption": "string (100-150 words)",
+  "instagram_hashtags": ["string (exactly 10)"],
+  "facebook_post": "string (80-100 words)",
+  "twitter_post": "string (under 280 chars)",
+  "linkedin_post": "string (80-100 words)",
+  "short_form_video_script": "string (100 words MAX)",
+  "email_blast": "string (100-150 words)"
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.socialMedia)) as SocialMediaModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.socialMedia, 'socialMedia')) as SocialMediaModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -540,12 +645,22 @@ export async function generateBuyerCMA(
   const system =
     'You are a Florida real estate agent creating a buyer-facing CMA presentation. Your goal is to justify the listing price with data and position the property as a strong value. Be professional, data-driven, and persuasive without being pushy.';
 
-  const prompt = `Using the property context above, create a buyer-facing Comparative Market Analysis presentation that an agent can share with potential buyers to justify the listing price.
+  const prompt = `Using the property context above, create a buyer-facing CMA presentation.
+
+STRICT OUTPUT CONSTRAINTS:
+- executive_summary: 2-3 sentences MAX
+- property_highlights: exactly 6 items, under 10 words each
+- comparable_sales: MAX 5 comps, condition_comparison and price_adjustment: 1 sentence each
+- market_position: 2 sentences MAX
+- value_justification: 2-3 sentences MAX
+- investment_outlook: 2 sentences MAX
+- neighborhood_highlights: exactly 5 items, under 10 words each
+- price_per_sqft_analysis: 1-2 sentences MAX
 
 Return JSON with this exact structure:
 {
-  "executive_summary": "string (2-3 sentences positioning the property and price)",
-  "property_highlights": ["string (8-10 key selling points)"],
+  "executive_summary": "string (2-3 sentences)",
+  "property_highlights": ["string (exactly 6 items)"],
   "comparable_sales": [
     {
       "address": "string",
@@ -555,18 +670,18 @@ Return JSON with this exact structure:
       "beds": 0,
       "baths": 0,
       "sale_date": "string",
-      "condition_comparison": "string (how this comp compares to subject property)",
-      "price_adjustment": "string (why subject is priced higher/lower than this comp)"
+      "condition_comparison": "string (1 sentence)",
+      "price_adjustment": "string (1 sentence)"
     }
   ],
-  "market_position": "string (where this property sits in the market — above/below/at market value and why)",
-  "value_justification": "string (3-4 sentences explaining why the price is fair/competitive)",
-  "investment_outlook": "string (appreciation potential, rental potential, market trajectory)",
-  "neighborhood_highlights": ["string (5-7 neighborhood selling points)"],
-  "price_per_sqft_analysis": "string (how this property's $/sqft compares to area average)"
+  "market_position": "string (2 sentences)",
+  "value_justification": "string (2-3 sentences)",
+  "investment_outlook": "string (2 sentences)",
+  "neighborhood_highlights": ["string (exactly 5 items)"],
+  "price_per_sqft_analysis": "string (1-2 sentences)"
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.buyerCMA)) as BuyerCMAModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.buyerCMA, 'buyerCMA')) as BuyerCMAModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -582,24 +697,32 @@ export async function generateOpenHouse(
   const system =
     'You are an experienced Florida listing agent preparing for an open house. Create practical, professional materials that help the agent run a successful open house and convert visitors to offers.';
 
-  const prompt = `Using the property context above, create a complete open house package.
+  const prompt = `Using the property context above, create an open house package.
+
+STRICT OUTPUT CONSTRAINTS:
+- property_fact_sheet: 150 words MAX (bullet-style, not paragraphs)
+- feature_highlights: exactly 8 items, under 10 words each
+- neighborhood_info: 3-4 sentences MAX
+- agent_talking_points: exactly 6 items, 1 sentence each
+- objection_handlers: exactly 4 items, response: 1-2 sentences each
+- follow_up_email_template: 100 words MAX
 
 Return JSON with this exact structure:
 {
-  "property_fact_sheet": "string (formatted property overview suitable for a one-page handout — include address, beds, baths, sqft, year built, lot size, price, key features, HOA info if applicable)",
-  "feature_highlights": ["string (10-12 standout features to emphasize during tours)"],
-  "neighborhood_info": "string (paragraph about the neighborhood — schools, dining, shopping, lifestyle)",
-  "agent_talking_points": ["string (8-10 key talking points for the agent during showings)"],
+  "property_fact_sheet": "string (150 words MAX, bullet-style)",
+  "feature_highlights": ["string (exactly 8 items)"],
+  "neighborhood_info": "string (3-4 sentences)",
+  "agent_talking_points": ["string (exactly 6 items)"],
   "objection_handlers": [
     {
-      "objection": "string (common buyer objection)",
-      "response": "string (professional response)"
+      "objection": "string",
+      "response": "string (1-2 sentences)"
     }
   ],
-  "follow_up_email_template": "string (email to send to open house visitors after the event)"
+  "follow_up_email_template": "string (100 words MAX)"
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.openHouse)) as OpenHouseModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.openHouse, 'openHouse')) as OpenHouseModule | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -614,20 +737,29 @@ export async function generateMarketSnapshot(
   const system =
     'You are a Florida real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual market data provided — do not fabricate statistics.';
 
-  const prompt = `Using the property context above (which includes real market data), create a neighborhood/market snapshot report.
+  const prompt = `Using the property context above (which includes real market data), create a market snapshot.
+
+STRICT OUTPUT CONSTRAINTS:
+- market_summary: 2-3 sentences MAX
+- inventory_level: 1 sentence
+- buyer_vs_seller_market: 1 sentence
+- price_trend_narrative: 2 sentences MAX
+- best_time_to_list: 1-2 sentences
+- key_insights: exactly 5 items, 1 sentence each
+- comparable_recent_sales: MAX 5 comps
 
 Return JSON with this exact structure:
 {
-  "market_summary": "string (3-4 sentence overview of current market conditions in this area)",
+  "market_summary": "string (2-3 sentences)",
   "median_price": 0,
   "avg_price_per_sqft": 0,
   "avg_days_on_market": 0,
-  "inventory_level": "string (Low/Moderate/High with context)",
+  "inventory_level": "string (1 sentence)",
   "market_trend": "Rising|Stable|Declining",
-  "buyer_vs_seller_market": "string (which type and why)",
-  "price_trend_narrative": "string (how prices have moved recently and where they're heading)",
-  "best_time_to_list": "string (seasonal advice for this specific Florida market)",
-  "key_insights": ["string (5-7 actionable market insights)"],
+  "buyer_vs_seller_market": "string (1 sentence)",
+  "price_trend_narrative": "string (2 sentences)",
+  "best_time_to_list": "string (1-2 sentences)",
+  "key_insights": ["string (exactly 5 items, 1 sentence each)"],
   "comparable_recent_sales": [
     {
       "address": "string",
@@ -641,5 +773,5 @@ Return JSON with this exact structure:
   ]
 }`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.marketSnapshot)) as MarketSnapshotModule | null;
+  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.marketSnapshot, 'marketSnapshot')) as MarketSnapshotModule | null;
 }

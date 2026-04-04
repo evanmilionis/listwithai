@@ -84,17 +84,31 @@ export async function generateReport(reportId: string): Promise<void> {
           bathrooms:     typedReport.baths,
           squareFootage: typedReport.sqft,
           propertyType,
+        }).catch((err) => {
+          console.error('Rentcast fetch failed entirely:', err);
+          return { property: null, valuation: null, market: null } as RentcastData;
         }),
         fetchNearbyAmenities(
           typedReport.property_address,
           typedReport.property_city,
           typedReport.property_state,
           typedReport.property_zip
-        ),
+        ).catch((err) => {
+          console.error('Google Places fetch failed:', err);
+          return null;
+        }),
       ]);
       rentcastData = fetchedRentcast;
       amenities = fetchedAmenities;
 
+      // Log what we got so we can diagnose issues
+      const hasValuation = !!rentcastData.valuation;
+      const hasMarket = !!rentcastData.market;
+      const hasProperty = !!rentcastData.property;
+      console.log(`Rentcast results — property: ${hasProperty}, valuation: ${hasValuation}, market: ${hasMarket}`);
+      console.log(`Google Places — amenities: ${!!amenities}`);
+
+      // Still cache whatever we got (even partial) so regeneration doesn't re-fetch
       await supabase
         .from('reports')
         .update({ rentcast_data: rentcastData })
@@ -115,33 +129,68 @@ export async function generateReport(reportId: string): Promise<void> {
     //    All 5 modules run concurrently to fit within Vercel's 60s timeout
     // -----------------------------------------------------------------------
     console.log('Starting all 5 Claude modules in parallel...');
+    const moduleStart = Date.now();
     const [timeline, improvements, pricing, listing, legal] = await Promise.all([
       generateTimeline(typedReport, rentcastData, ctx).catch((err) => {
-        console.error('Timeline failed:', err);
+        console.error('Timeline THREW:', err instanceof Error ? err.message : err);
         return null;
       }),
       generateImprovements(typedReport, rentcastData, ctx).catch((err) => {
-        console.error('Improvements failed:', err);
+        console.error('Improvements THREW:', err instanceof Error ? err.message : err);
         return null;
       }),
       generatePricingAnalysis(typedReport, rentcastData, ctx).catch((err) => {
-        console.error('Pricing failed:', err);
+        console.error('Pricing THREW:', err instanceof Error ? err.message : err);
         return null;
       }),
       generateListingCopy(typedReport, rentcastData, amenities, ctx).catch((err) => {
-        console.error('Listing failed:', err);
+        console.error('Listing THREW:', err instanceof Error ? err.message : err);
         return null;
       }),
       generateLegalPackage(typedReport, ctx).catch((err) => {
-        console.error('Legal failed:', err);
+        console.error('Legal THREW:', err instanceof Error ? err.message : err);
         return null;
       }),
     ]);
+    console.log(`Base modules completed in ${((Date.now() - moduleStart) / 1000).toFixed(1)}s`);
     console.log('  Timeline:', timeline ? 'OK' : 'FAILED');
     console.log('  Improvements:', improvements ? 'OK' : 'FAILED');
     console.log('  Pricing:', pricing ? 'OK' : 'FAILED');
     console.log('  Listing:', listing ? 'OK' : 'FAILED');
     console.log('  Legal:', legal ? 'OK' : 'FAILED');
+
+    // -----------------------------------------------------------------------
+    // 4a. RETRY failed core modules once — these are what the customer paid for
+    // -----------------------------------------------------------------------
+    let retryTimeline = timeline;
+    let retryPricing = pricing;
+    let retryListing = listing;
+
+    const coreFailures = [
+      !timeline && 'timeline',
+      !pricing && 'pricing',
+      !listing && 'listing',
+    ].filter(Boolean) as string[];
+
+    if (coreFailures.length > 0) {
+      console.log(`Retrying ${coreFailures.length} failed core module(s): ${coreFailures.join(', ')}`);
+      const retryStart = Date.now();
+
+      const retries = await Promise.all([
+        !timeline ? generateTimeline(typedReport, rentcastData, ctx).catch(() => null) : Promise.resolve(timeline),
+        !pricing ? generatePricingAnalysis(typedReport, rentcastData, ctx).catch(() => null) : Promise.resolve(pricing),
+        !listing ? generateListingCopy(typedReport, rentcastData, amenities, ctx).catch(() => null) : Promise.resolve(listing),
+      ]);
+
+      retryTimeline = retries[0] as typeof timeline;
+      retryPricing = retries[1] as typeof pricing;
+      retryListing = retries[2] as typeof listing;
+
+      console.log(`Core retries completed in ${((Date.now() - retryStart) / 1000).toFixed(1)}s`);
+      if (!timeline && retryTimeline) console.log('  Timeline: RECOVERED on retry');
+      if (!pricing && retryPricing) console.log('  Pricing: RECOVERED on retry');
+      if (!listing && retryListing) console.log('  Listing: RECOVERED on retry');
+    }
 
     // -----------------------------------------------------------------------
     // 4b. Run AGENT-ONLY modules (social media, buyer CMA, open house, market snapshot)
@@ -180,12 +229,17 @@ export async function generateReport(reportId: string): Promise<void> {
 
     // -----------------------------------------------------------------------
     // 5. Store results & mark complete
+    //    Use retried values for core modules (falls back to original if no retry needed)
     // -----------------------------------------------------------------------
+    const finalTimeline = retryTimeline;
+    const finalPricing = retryPricing;
+    const finalListing = retryListing;
+
     const reportOutput: ReportOutput = {
-      timeline,
+      timeline: finalTimeline,
       improvements,
-      pricing,
-      listing,
+      pricing: finalPricing,
+      listing: finalListing,
       legal,
       amenities,
       social_media: socialMedia,
@@ -194,28 +248,50 @@ export async function generateReport(reportId: string): Promise<void> {
       market_snapshot: marketSnapshot,
     };
 
-    const baseModules = [timeline, improvements, pricing, listing, legal].filter(Boolean).length;
+    const baseModules = [finalTimeline, improvements, finalPricing, finalListing, legal].filter(Boolean).length;
     const agentModules = typedReport.customer_type === 'agent'
       ? [socialMedia, buyerCMA, openHouse, marketSnapshot].filter(Boolean).length
       : 0;
     const totalModules = typedReport.customer_type === 'agent' ? 9 : 5;
     const successCount = baseModules + agentModules;
+
+    // Core modules that MUST succeed for the report to be useful to a paying customer.
+    // Timeline, pricing, and listing are the minimum viable report.
+    const coreModulesPresent = !!(finalTimeline && finalPricing && finalListing);
+    const failedModules: string[] = [];
+    if (!finalTimeline) failedModules.push('timeline');
+    if (!improvements)  failedModules.push('improvements');
+    if (!finalPricing)  failedModules.push('pricing');
+    if (!finalListing)  failedModules.push('listing');
+    if (!legal)         failedModules.push('legal');
+
     console.log(`Report modules complete: ${successCount}/${totalModules} succeeded`);
+    if (failedModules.length > 0) {
+      console.error(`FAILED modules: ${failedModules.join(', ')}`);
+    }
     console.log('Data sizes:', {
-      timeline:     timeline     ? JSON.stringify(timeline).length     : 0,
-      improvements: improvements ? JSON.stringify(improvements).length : 0,
-      pricing:      pricing      ? JSON.stringify(pricing).length      : 0,
-      listing:      listing      ? JSON.stringify(listing).length      : 0,
-      legal:        legal        ? JSON.stringify(legal).length        : 0,
+      timeline:     finalTimeline ? JSON.stringify(finalTimeline).length : 0,
+      improvements: improvements  ? JSON.stringify(improvements).length  : 0,
+      pricing:      finalPricing  ? JSON.stringify(finalPricing).length  : 0,
+      listing:      finalListing  ? JSON.stringify(finalListing).length  : 0,
+      legal:        legal         ? JSON.stringify(legal).length         : 0,
     });
 
+    // Determine final status:
+    // - 'complete' only if ALL 3 core modules (timeline, pricing, listing) succeeded
+    // - 'failed' if any core module is missing — customer paid for a full report
     const reportUrl = `${process.env.NEXT_PUBLIC_APP_URL}/report/${reportId}`;
+    const finalStatus = coreModulesPresent ? 'complete' : 'failed';
+
+    if (finalStatus === 'failed') {
+      console.error(`Report ${reportId} marked FAILED — missing core modules: ${failedModules.filter(m => ['timeline', 'pricing', 'listing'].includes(m)).join(', ')}`);
+    }
 
     const { error: saveError, data: savedData } = await supabase
       .from('reports')
       .update({
         report_output: reportOutput,
-        status:        successCount > 0 ? 'complete' : 'failed',
+        status:        finalStatus,
         report_url:    reportUrl,
       })
       .eq('id', reportId)
@@ -232,10 +308,10 @@ export async function generateReport(reportId: string): Promise<void> {
     console.log('Verified saved data — non-null keys:', savedKeys);
 
     // -----------------------------------------------------------------------
-    // 6. Send notification email (first generation only)
+    // 6. Send notification email (first generation only, and ONLY on success)
     //    For agent reports: send to client AND agent (separate emails)
     // -----------------------------------------------------------------------
-    if (!isRegeneration) {
+    if (finalStatus === 'complete' && !isRegeneration) {
       const formMeta = (typedReport.report_output as unknown as Record<string, unknown>)?.form_metadata as Record<string, string> | undefined;
 
       if (typedReport.customer_type === 'agent' && formMeta) {
@@ -264,11 +340,13 @@ export async function generateReport(reportId: string): Promise<void> {
         );
       }
       console.log('Notification email(s) sent');
+    } else if (finalStatus === 'failed') {
+      console.error(`Report ${reportId} FAILED — NOT sending customer email. Failed modules: ${failedModules.join(', ')}`);
     } else {
       console.log('Skipping email (regeneration)');
     }
 
-    console.log(`Report ${reportId} generated successfully (${successCount}/${totalModules} modules)`);
+    console.log(`Report ${reportId} generation ${finalStatus} (${successCount}/${totalModules} modules)`);
   } catch (error) {
     console.error(`Report ${reportId} generation failed:`, error);
 

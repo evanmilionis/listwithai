@@ -210,7 +210,20 @@ export interface TimelineModule {
   recommended_list_date: string;
   recommended_list_day: string;
   estimated_close_date: string;
-  weeks: {
+  // Phase-based (current) — 4-6 phases with 3-5 tasks each
+  phases?: {
+    phase_number: number;
+    label: string;
+    duration: string;
+    tasks: {
+      task: string;
+      description: string;
+      priority: 'high' | 'medium' | 'low';
+      estimated_hours: number;
+    }[];
+  }[];
+  // Legacy week-based (backwards compat for old reports)
+  weeks?: {
     week_number: number;
     label: string;
     tasks: {
