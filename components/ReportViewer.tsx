@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { formatCurrency, getConditionLabel } from '@/lib/utils';
 import type { Report, SocialMediaModule, BuyerCMAModule, OpenHouseModule, MarketSnapshotModule, PricingModule, TimelineModule, ImprovementsModule, LegalModule } from '@/types';
@@ -13,6 +13,7 @@ import {
   Download,
   Share2,
   ChevronRight,
+  ChevronLeft,
   Calendar,
   DollarSign,
   Home,
@@ -1293,10 +1294,40 @@ function NextStepsPanel({ report }: { report: Report }) {
 /* ------------------------------------------------------------------ */
 export default function ReportViewer({ report, agentMode = false, stagingCredits = 0 }: ReportViewerProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
-  const filteredTabs = agentMode
+  // Hide MLS tab for agent-mode AND for agent-generated reports viewed by clients
+  const isAgentReport = agentMode || report.customer_type === 'agent';
+  const filteredTabs = isAgentReport
     ? TABS.filter((t) => t.key !== 'legal' && t.key !== 'mls')
     : TABS;
   const [shareToast, setShareToast] = useState(false);
+
+  // Tab scroll state
+  const tabScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkScroll = useCallback(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = tabScrollRef.current;
+    if (!el) return;
+    checkScroll();
+    el.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    return () => {
+      el.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll, filteredTabs]);
+
+  const scrollTabs = (dir: 'left' | 'right') => {
+    tabScrollRef.current?.scrollBy({ left: dir === 'left' ? -200 : 200, behavior: 'smooth' });
+  };
 
   // Processing state
   if (report.status === 'processing') {
@@ -1610,7 +1641,24 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       {report.status === 'complete' && <NextStepsPanel report={report} />}
 
       {/* Tab navigation */}
-      <div className="border-b border-slate-200 -mx-1 overflow-x-auto">
+      <div className="relative border-b border-slate-200 -mx-1">
+        {canScrollLeft && (
+          <button
+            onClick={() => scrollTabs('left')}
+            className="absolute left-0 top-0 bottom-0 z-10 flex items-center px-1 bg-gradient-to-r from-white via-white to-transparent pr-4"
+          >
+            <ChevronLeft className="h-4 w-4 text-slate-500" />
+          </button>
+        )}
+        {canScrollRight && (
+          <button
+            onClick={() => scrollTabs('right')}
+            className="absolute right-0 top-0 bottom-0 z-10 flex items-center px-1 bg-gradient-to-l from-white via-white to-transparent pl-4"
+          >
+            <ChevronRight className="h-4 w-4 text-slate-500" />
+          </button>
+        )}
+        <div ref={tabScrollRef} className="overflow-x-auto scrollbar-hide">
         <nav className="flex gap-0 px-1 min-w-max">
           {filteredTabs.map((tab) => {
             const Icon = tab.icon;
@@ -1647,6 +1695,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
             </button>
           ))}
         </nav>
+        </div>
       </div>
 
       {/* Tab content */}
