@@ -874,7 +874,7 @@ export default function IntakeForm({
                 {isLoading
                   ? 'Submitting...'
                   : mode === 'homeowner'
-                  ? 'Proceed to Payment \u2014 $500'
+                  ? 'Proceed to Payment \u2014 $100/mo'
                   : 'Generate Report'}
               </Button>
             )}

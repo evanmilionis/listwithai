@@ -51,7 +51,7 @@ function SuccessContent() {
             </div>
 
             <p className="mt-6 text-xs text-slate-500">
-              Questions? Contact us at hello@listwithai.io
+              Questions? Contact us at evangelos@univentureprop.com
             </p>
           </div>
         </main>
@@ -100,7 +100,7 @@ function SuccessContent() {
           </div>
 
           <p className="mt-6 text-xs text-slate-500">
-            Questions? Contact us at hello@listwithai.io
+            Questions? Contact us at evangelos@univentureprop.com
           </p>
         </div>
       </main>

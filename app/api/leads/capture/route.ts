@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase';
+import { sendLeadNurtureEmail } from '@/lib/resend';
 
 export async function POST(request: NextRequest) {
   try {
@@ -98,6 +99,11 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Send nurture email if this is an exit-intent lead with just an email
+    if (leadData.email && body.source === 'exit_intent') {
+      sendLeadNurtureEmail(leadData.email as string).catch(() => {});
     }
 
     return NextResponse.json({ id: data.id });

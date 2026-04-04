@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
     if (customer_type === 'agent') {
       const session = await getStripe().checkout.sessions.create({
         mode: 'subscription',
+        payment_method_types: ['card', 'link'],
         line_items: [
           {
             price: process.env.STRIPE_AGENT_PRICE_ID!,
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
 
     const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
+      payment_method_types: ['card', 'link'],
       line_items: [
         {
           price: process.env.STRIPE_HOMEOWNER_SUB_PRICE_ID!,

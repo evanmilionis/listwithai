@@ -7,6 +7,85 @@ function getResend() {
 }
 
 /**
+ * Send a sales nurture email to someone who requested more info via the exit popup.
+ */
+export async function sendLeadNurtureEmail(
+  email: string,
+): Promise<boolean> {
+  try {
+    const { error } = await getResend().emails.send({
+      from: FROM,
+      to: email,
+      subject: 'Here\'s exactly what ListAI does for you',
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #1a1a1a;">
+          <div style="background: #0A0F1E; padding: 32px; border-radius: 12px 12px 0 0; text-align: center;">
+            <h1 style="color: white; font-size: 24px; margin: 0; font-weight: 800;">List<span style="color: #3B82F6;">AI</span></h1>
+          </div>
+          <div style="padding: 32px; background: #ffffff; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+            <p style="font-size: 16px; color: #334155; margin-bottom: 24px;">
+              Quick math: on a $400,000 home, a 3% listing agent commission is <strong>$12,000</strong>.<br><br>
+              ListAI replaces that for <strong>$100/month</strong>.
+            </p>
+
+            <h2 style="font-size: 18px; color: #0A0F1E; margin-bottom: 16px;">Here's what you get:</h2>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+              ${[
+                ['📊', 'Data-driven pricing analysis', 'Based on real comparable sales — same data your agent uses'],
+                ['📅', 'Week-by-week selling timeline', 'Tailored to your property, condition, and target close date'],
+                ['✍️', 'MLS-ready listing copy', 'Written to attract buyers. Paste directly into Zillow or MLS'],
+                ['🏠', 'Home improvement ROI guide', 'Know exactly which upgrades are worth doing before you list'],
+                ['⚖️', 'State-specific legal guidance', 'Disclosure templates, contract docs, and attorney referrals'],
+                ['📸', 'Virtual staging', 'AI-enhanced photos — no photographer needed'],
+                ['🤝', 'Offer review tool', 'Paste in any offer and get AI guidance: accept, counter, or reject'],
+              ].map(([icon, title, desc]) => `
+                <tr>
+                  <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top; font-size: 20px; width: 32px;">${icon}</td>
+                  <td style="padding: 10px 8px; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
+                    <strong style="font-size: 14px; color: #0f172a; display: block;">${title}</strong>
+                    <span style="font-size: 13px; color: #64748b;">${desc}</span>
+                  </td>
+                </tr>
+              `).join('')}
+            </table>
+
+            <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
+              <p style="margin: 0; font-size: 14px; color: #0369a1;">
+                <strong>Homeowners using ListAI save an average of $15,000</strong> in agent commissions.
+              </p>
+            </div>
+
+            <p style="font-size: 14px; color: #64748b; margin-bottom: 24px;">
+              The report takes about 3 minutes to generate. You fill out a quick form, we pull the real market data, and your full selling toolkit lands in your inbox.
+            </p>
+
+            <div style="text-align: center; margin-bottom: 24px;">
+              <a href="${process.env.NEXT_PUBLIC_APP_URL}/homeowner"
+                style="display: inline-block; padding: 14px 32px; background: #0A0F1E; color: #ffffff; text-decoration: none; border-radius: 10px; font-weight: 700; font-size: 16px;">
+                Start My Home Sale — $100/mo →
+              </a>
+            </div>
+
+            <p style="font-size: 13px; color: #94a3b8; text-align: center; margin: 0;">
+              Cancel anytime. No long-term commitment. No agent commission.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('sendLeadNurtureEmail error:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('sendLeadNurtureEmail failed:', err);
+    return false;
+  }
+}
+
+/**
  * Send the "your report is ready" notification.
  */
 export async function sendReportReadyEmail(
