@@ -210,21 +210,15 @@ export default function LandingPage() {
             <p className="text-slate-500 mb-10 max-w-xl mx-auto">
               Watch a walkthrough of the complete FSBO toolkit — pricing, timeline, legal, and more.
             </p>
-            {/* Video placeholder — replace src with your Loom/Vimeo/YouTube embed */}
-            <div className="relative rounded-3xl overflow-hidden bg-[#0A0F1E] aspect-video shadow-2xl shadow-slate-200 border border-slate-200 group cursor-pointer">
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-white/15 flex items-center justify-center border border-white/20 group-hover:bg-white/20 transition-all">
-                  <Play className="text-white ml-1" size={26} fill="white" />
-                </div>
-                <p className="text-sm text-slate-400">90-second product walkthrough</p>
-              </div>
-              {/* Swap the div above for an iframe once you have a video URL:
-              <iframe
-                src="YOUR_VIDEO_EMBED_URL"
-                className="absolute inset-0 w-full h-full"
-                allow="autoplay; fullscreen"
-                allowFullScreen
-              /> */}
+            <div className="relative rounded-3xl overflow-hidden bg-[#0A0F1E] aspect-video shadow-2xl shadow-slate-200 border border-slate-200">
+              <video
+                src="/demo.mp4"
+                className="absolute inset-0 w-full h-full object-cover"
+                controls
+                playsInline
+                preload="metadata"
+                poster=""
+              />
             </div>
           </div>
         </section>
