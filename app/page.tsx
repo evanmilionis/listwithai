@@ -10,7 +10,6 @@ import {
   TrendingUp,
   CheckCircle,
   ArrowRight,
-  Play,
   BarChart3,
   Gavel,
   Sparkles,
