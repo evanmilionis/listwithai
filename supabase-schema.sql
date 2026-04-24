@@ -98,6 +98,18 @@ CREATE TABLE buyer_inquiries (
 CREATE INDEX idx_buyer_inquiries_report_id ON buyer_inquiries(report_id);
 CREATE INDEX idx_buyer_inquiries_created_at ON buyer_inquiries(created_at DESC);
 
+-- Property photos (uploaded by homeowner / agent for the public listing page)
+CREATE TABLE property_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  report_id UUID NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  storage_path TEXT,
+  order_index INT DEFAULT 0
+);
+
+CREATE INDEX idx_property_photos_report_id ON property_photos(report_id, order_index);
+
 -- RLS policies
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_subscriptions ENABLE ROW LEVEL SECURITY;

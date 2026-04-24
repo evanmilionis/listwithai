@@ -8,8 +8,10 @@ import PropertyInquiryForm from '@/components/PropertyInquiryForm';
 import { formatCurrency } from '@/lib/utils';
 import { Bed, Bath, Maximize2, MapPin, Calendar, Home as HomeIcon } from 'lucide-react';
 
-/** Fetch just the data needed for the public page. */
-async function getPublicProperty(id: string): Promise<(Report & { access_status: string }) | null> {
+/** Fetch just the data needed for the public page (report + photos). */
+async function getPublicProperty(
+  id: string
+): Promise<{ report: Report; photos: { id: string; url: string }[] } | null> {
   const supabase = createServiceClient();
 
   const { data: report, error } = await supabase
@@ -38,19 +40,30 @@ async function getPublicProperty(id: string): Promise<(Report & { access_status:
     if (!active) return null;
   }
 
-  return { ...report, access_status: 'public' };
+  // Load photos (may be empty; we fall back to Street View)
+  const { data: photos } = await supabase
+    .from('property_photos')
+    .select('id, url, order_index')
+    .eq('report_id', id)
+    .order('order_index', { ascending: true });
+
+  return {
+    report: report as Report,
+    photos: (photos ?? []).map((p) => ({ id: p.id, url: p.url })),
+  };
 }
 
 export async function generateMetadata(
   { params }: { params: Promise<{ id: string }> }
 ): Promise<Metadata> {
   const { id } = await params;
-  const report = await getPublicProperty(id);
+  const bundle = await getPublicProperty(id);
 
-  if (!report) {
+  if (!bundle) {
     return { title: 'Listing not found | ListAI' };
   }
 
+  const { report } = bundle;
   const listing = (report.report_output as ReportOutput | null)?.listing;
   const price = report.asking_price;
   const address = `${report.property_address}, ${report.property_city}, ${report.property_state} ${report.property_zip}`;
@@ -81,21 +94,27 @@ export default async function PublicPropertyPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const report = await getPublicProperty(id);
+  const bundle = await getPublicProperty(id);
 
-  if (!report) notFound();
+  if (!bundle) notFound();
 
+  const { report, photos } = bundle;
   const output = (report.report_output as ReportOutput | null);
   const listing = output?.listing;
   const amenities = output?.amenities;
 
   const address = `${report.property_address}, ${report.property_city}, ${report.property_state} ${report.property_zip}`;
 
-  // Google Street View static image — free with your existing Google Places key
-  // if Street View Static API is enabled in Google Cloud.
-  const streetViewUrl = process.env.GOOGLE_PLACES_API_KEY
-    ? `https://maps.googleapis.com/maps/api/streetview?size=1200x600&location=${encodeURIComponent(address)}&fov=80&key=${process.env.GOOGLE_PLACES_API_KEY}`
-    : null;
+  // If the owner uploaded photos, use those. Otherwise fall back to Google
+  // Street View. Street View requires Street View Static API enabled in
+  // Google Cloud for the GOOGLE_PLACES_API_KEY.
+  const hasUploadedPhotos = photos.length > 0;
+  const heroUrl = hasUploadedPhotos
+    ? photos[0].url
+    : process.env.GOOGLE_PLACES_API_KEY
+      ? `https://maps.googleapis.com/maps/api/streetview?size=1200x600&location=${encodeURIComponent(address)}&fov=80&key=${process.env.GOOGLE_PLACES_API_KEY}`
+      : null;
+  const galleryPhotos = hasUploadedPhotos ? photos.slice(1) : [];
 
   // Schema.org JSON-LD for SEO
   const listingJsonLd = {
@@ -124,12 +143,12 @@ export default async function PublicPropertyPage({
       <main className="min-h-screen bg-slate-50 pt-24 pb-16">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
-          {/* Hero: Street View + price overlay */}
+          {/* Hero: uploaded photo (preferred) or Street View fallback + price overlay */}
           <div className="relative rounded-3xl overflow-hidden bg-slate-200 aspect-[2/1] shadow-sm mb-8">
-            {streetViewUrl ? (
+            {heroUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={streetViewUrl}
+                src={heroUrl}
                 alt={address}
                 className="absolute inset-0 w-full h-full object-cover"
               />
@@ -153,6 +172,22 @@ export default async function PublicPropertyPage({
               </p>
             </div>
           </div>
+
+          {/* Photo gallery — if more than 1 uploaded */}
+          {galleryPhotos.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-8">
+              {galleryPhotos.map((photo) => (
+                <div key={photo.id} className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-100">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={photo.url}
+                    alt="Property"
+                    className="absolute inset-0 w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Quick stats */}
           <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-8">

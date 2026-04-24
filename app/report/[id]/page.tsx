@@ -7,6 +7,8 @@ import Footer from '@/components/Footer';
 import ReportViewer from '@/components/ReportViewer';
 import ShareListingBanner from '@/components/ShareListingBanner';
 import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
+import PropertyPhotoManager from '@/components/PropertyPhotoManager';
+import InquiriesPanel from '@/components/InquiriesPanel';
 import type { Report } from '@/types';
 
 type AccessStatus = 'trialing' | 'active' | 'expired' | 'none';
@@ -246,6 +248,13 @@ export default function ReportPage() {
               )}
               {/* Public listing share link — surfaced for both homeowners and agents */}
               <ShareListingBanner reportId={id} />
+
+              {/* Photo upload + inquiries — owner's workspace on the report page */}
+              <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <PropertyPhotoManager reportId={id} />
+                <InquiriesPanel reportId={id} />
+              </div>
+
               <ReportViewer report={report} accessStatus={report.access_status} />
 
               {/* Account footer — gives homeowners a clear way to manage / cancel */}
