@@ -8,6 +8,12 @@ import PropertyInquiryForm from '@/components/PropertyInquiryForm';
 import { formatCurrency } from '@/lib/utils';
 import { Bed, Bath, Maximize2, MapPin, Calendar, Home as HomeIcon } from 'lucide-react';
 
+// Never statically cache — always fetch fresh photos + subscription state.
+// This ensures newly uploaded photos show up immediately and access gating
+// reflects live Stripe state.
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /** Fetch just the data needed for the public page (report + photos). */
 async function getPublicProperty(
   id: string
