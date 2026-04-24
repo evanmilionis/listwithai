@@ -6,24 +6,32 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ReportViewer from '@/components/ReportViewer';
 import ShareListingBanner from '@/components/ShareListingBanner';
-import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import PropertyPhotoManager from '@/components/PropertyPhotoManager';
 import InquiriesPanel from '@/components/InquiriesPanel';
+import SubscriptionControls from '@/components/SubscriptionControls';
 import type { Report } from '@/types';
 
 type AccessStatus = 'trialing' | 'active' | 'expired' | 'none';
+
+type ReportWithAccess = Report & {
+  access_status?: AccessStatus;
+  cancel_at_period_end?: boolean;
+  current_period_end?: string | null;
+  can_reactivate?: boolean;
+};
 
 export default function ReportPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [report, setReport] = useState<(Report & { access_status?: AccessStatus }) | null>(null);
+  const [report, setReport] = useState<ReportWithAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gateUnlocked, setGateUnlocked] = useState(false);
   const [gateEmail, setGateEmail] = useState('');
   const [gateName, setGateName] = useState('');
   const [gateLoading, setGateLoading] = useState(false);
+  const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
     if (!id) return;
@@ -60,7 +68,9 @@ export default function ReportPage() {
     }
 
     fetchReport();
-  }, [id]);
+  }, [id, refreshTick]);
+
+  const refresh = () => setRefreshTick((n) => n + 1);
 
   const handleGateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -196,7 +206,7 @@ export default function ReportPage() {
             </div>
           )}
 
-          {/* Subscription expired — lock full report behind resubscribe gate */}
+          {/* Subscription expired — lock full report behind resubscribe / reactivate gate */}
           {!loading && !error && report && gateUnlocked && report.access_status === 'expired' && (
             <div className="flex flex-col items-center justify-center py-16">
               <div className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 p-10 shadow-sm text-center">
@@ -209,17 +219,19 @@ export default function ReportPage() {
                   Your report is locked
                 </h2>
                 <p className="text-slate-500 mb-1 text-sm">
-                  Your subscription ended. Resubscribe for $100/mo to regain full access to your
+                  Your subscription ended. Reactivate to regain full access to your
                 </p>
                 <p className="text-slate-900 font-semibold mb-6 text-sm">
                   {report.property_address}, {report.property_city} report
                 </p>
-                <a
-                  href="/homeowner"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#0A0F1E] text-white font-semibold rounded-xl hover:bg-slate-800 transition-colors text-sm"
-                >
-                  Resubscribe — $100/mo
-                </a>
+                <SubscriptionControls
+                  reportId={id}
+                  accessStatus="expired"
+                  cancelAtPeriodEnd={false}
+                  currentPeriodEnd={null}
+                  canReactivate={!!report.can_reactivate}
+                  onChange={refresh}
+                />
                 <p className="mt-4 text-xs text-slate-400">
                   Selling a home is a multi-month process — keep your tools on hand.
                 </p>
@@ -230,20 +242,46 @@ export default function ReportPage() {
           {/* Report content (full access: trialing, active, or sub hasn't loaded yet) */}
           {!loading && !error && report && gateUnlocked && report.access_status !== 'expired' && (
             <>
-              {report.access_status === 'trialing' && (
-                <div className="mb-6 flex items-center justify-between gap-4 px-5 py-3 rounded-xl bg-blue-50 border border-blue-100">
-                  <div className="flex items-center gap-3 text-sm text-blue-900">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">i</span>
-                    <span>
-                      You&apos;re on the free trial. Cancel before day 3 to avoid the $100/mo charge.
-                    </span>
-                  </div>
-                  <ManageSubscriptionButton
-                    reportId={id}
-                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2 whitespace-nowrap disabled:opacity-60"
-                  >
-                    Manage / Cancel
-                  </ManageSubscriptionButton>
+              {/* Trial / subscription status strip — shown in all active states */}
+              {(report.access_status === 'trialing' || report.access_status === 'active') && (
+                <div className="mb-6 space-y-2">
+                  {report.cancel_at_period_end ? (
+                    // Pending cancellation — offer to keep subscription
+                    <SubscriptionControls
+                      reportId={id}
+                      accessStatus={report.access_status}
+                      cancelAtPeriodEnd
+                      currentPeriodEnd={report.current_period_end ?? null}
+                      canReactivate={false}
+                      onChange={refresh}
+                    />
+                  ) : report.access_status === 'trialing' ? (
+                    // Active trial — banner + inline cancel button
+                    <div className="flex items-center justify-between gap-4 px-5 py-3 rounded-xl bg-blue-50 border border-blue-100">
+                      <div className="flex items-center gap-3 text-sm text-blue-900">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">i</span>
+                        <span>
+                          You&apos;re on the free trial.
+                          {report.current_period_end ? (
+                            <> Cancel before{' '}
+                              <strong>
+                                {new Date(report.current_period_end).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })}
+                              </strong>
+                              {' '}to avoid the $100/mo charge.
+                            </>
+                          ) : ' Cancel before day 3 to avoid the $100/mo charge.'}
+                        </span>
+                      </div>
+                      <SubscriptionControls
+                        reportId={id}
+                        accessStatus="trialing"
+                        cancelAtPeriodEnd={false}
+                        currentPeriodEnd={report.current_period_end ?? null}
+                        canReactivate={false}
+                        onChange={refresh}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               )}
               {/* Public listing share link — surfaced for both homeowners and agents */}
@@ -257,7 +295,8 @@ export default function ReportPage() {
 
               <ReportViewer report={report} accessStatus={report.access_status} />
 
-              {/* Account footer — gives homeowners a clear way to manage / cancel */}
+              {/* Account footer — gives homeowners a subtle cancel anchor when
+                  the top strip isn't showing (e.g. access_status = 'none') */}
               {report.customer_type === 'homeowner' && (
                 <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
                   <p>
@@ -266,9 +305,16 @@ export default function ReportPage() {
                       hello@listwithai.io
                     </a>
                   </p>
-                  <ManageSubscriptionButton reportId={id}>
-                    Manage subscription / Cancel
-                  </ManageSubscriptionButton>
+                  {(report.access_status === 'active' || report.access_status === 'trialing') && !report.cancel_at_period_end && (
+                    <SubscriptionControls
+                      reportId={id}
+                      accessStatus={report.access_status}
+                      cancelAtPeriodEnd={false}
+                      currentPeriodEnd={report.current_period_end ?? null}
+                      canReactivate={false}
+                      onChange={refresh}
+                    />
+                  )}
                 </div>
               )}
             </>
