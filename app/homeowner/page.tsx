@@ -52,8 +52,8 @@ export default function HomeownerPage() {
               Complete the form below to get your AI-powered selling toolkit.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg text-sm font-medium">
-              <span className="font-bold text-lg">$100/mo</span>
-              <span>subscription</span>
+              <span className="font-bold text-lg">Free 3-day trial</span>
+              <span>then $100/mo</span>
             </div>
           </div>
 

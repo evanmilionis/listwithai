@@ -73,7 +73,7 @@ function SuccessContent() {
             You&apos;re all set!
           </h1>
           <p className="mt-4 text-slate-600">
-            Your $100/mo subscription is confirmed. Your AI-powered selling report is being generated now.
+            Your 3-day free trial has started. Your AI-powered selling report is being generated now — no charge until day 3.
           </p>
 
           <div className="mt-8 bg-white rounded-xl border border-slate-200 p-6 text-left space-y-4">

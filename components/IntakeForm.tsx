@@ -874,7 +874,7 @@ export default function IntakeForm({
                 {isLoading
                   ? 'Submitting...'
                   : mode === 'homeowner'
-                  ? 'Proceed to Payment \u2014 $100/mo'
+                  ? 'Start Free 3-Day Trial'
                   : 'Generate Report'}
               </Button>
             )}

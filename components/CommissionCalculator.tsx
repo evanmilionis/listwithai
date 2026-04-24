@@ -60,7 +60,7 @@ export default function CommissionCalculator() {
         <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-5 text-center">
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">With ListAI</p>
           <p className="text-2xl sm:text-3xl font-bold text-emerald-600">$300</p>
-          <p className="text-xs text-emerald-500 mt-1">$100/mo + ~$200 MLS</p>
+          <p className="text-xs text-emerald-500 mt-1">Free trial · $100/mo after + ~$200 MLS</p>
         </div>
       </div>
 
@@ -75,7 +75,7 @@ export default function CommissionCalculator() {
         href="/homeowner"
         className="flex items-center justify-center gap-2 w-full py-4 bg-[#0A0F1E] text-white font-semibold rounded-xl hover:bg-slate-800 transition-colors text-sm"
       >
-        Start My Home Sale — $100/mo
+        Start Free — 3-Day Trial
         <ArrowRight size={16} />
       </Link>
     </div>

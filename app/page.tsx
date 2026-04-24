@@ -23,6 +23,10 @@ const faqs = [
     a: 'No. ListAI provides AI-generated informational templates and guidance only. All legal documents must be reviewed by a licensed real estate attorney before use. We include attorney referrals in every report.',
   },
   {
+    q: 'How does the free trial work?',
+    a: 'Start with a 3-day free trial — full access to your AI report immediately. If you cancel before day 3, you are not charged. After day 3, you are charged $100/month for continued access. Your report stays live for as long as your subscription is active.',
+  },
+  {
     q: 'What do I get for $100/mo?',
     a: 'A comprehensive AI report: selling timeline, improvement recommendations with ROI, data-driven pricing analysis, premium MLS listing copy, legal guidance, virtual staging, and real estate attorney referrals.',
   },
@@ -147,7 +151,7 @@ export default function LandingPage() {
           <div className="relative max-w-5xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/8 text-blue-300 text-xs font-medium mb-8 border border-white/10 backdrop-blur-sm">
               <Shield size={12} />
-              All 50 states · Cancel anytime · $100/mo
+              All 50 states · Free 3-day trial · Cancel anytime
             </div>
 
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.08]">
@@ -168,7 +172,7 @@ export default function LandingPage() {
                 href="/homeowner"
                 className="inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-white text-[#0A0F1E] text-base font-semibold rounded-2xl hover:bg-slate-100 transition-all shadow-[0_0_40px_rgba(255,255,255,0.15)] hover:shadow-[0_0_60px_rgba(255,255,255,0.2)]"
               >
-                Start My Home Sale — $100/mo
+                Start Free — 3-Day Trial
                 <ArrowRight size={18} />
               </Link>
               <Link
@@ -199,8 +203,24 @@ export default function LandingPage() {
           </div>
         </section>
 
-        {/* ─── VIDEO SECTION ─── */}
+        {/* ─── COMMISSION CALCULATOR (moved up — second section) ─── */}
         <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50">
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">Do the Math</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
+                Your agent is expensive.
+              </h2>
+              <p className="mt-3 text-slate-500">
+                See exactly how much you can keep by selling FSBO with ListAI.
+              </p>
+            </div>
+            <CommissionCalculator />
+          </div>
+        </section>
+
+        {/* ─── VIDEO SECTION ─── */}
+        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
           <div className="max-w-4xl mx-auto text-center">
             <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">See It In Action</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
@@ -223,7 +243,7 @@ export default function LandingPage() {
         </section>
 
         {/* ─── WHAT'S IN YOUR REPORT ─── */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
+        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-14">
               <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">The Report</p>
@@ -249,22 +269,6 @@ export default function LandingPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* ─── COMMISSION CALCULATOR ─── */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-50">
-          <div className="max-w-2xl mx-auto">
-            <div className="text-center mb-10">
-              <p className="text-sm font-semibold text-blue-600 uppercase tracking-widest mb-3">Do the Math</p>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-900">
-                Your agent is expensive.
-              </h2>
-              <p className="mt-3 text-slate-500">
-                See exactly how much you can keep by selling FSBO with ListAI.
-              </p>
-            </div>
-            <CommissionCalculator />
           </div>
         </section>
 
@@ -328,9 +332,12 @@ export default function LandingPage() {
                   </span>
                   <h3 className="text-xl font-bold text-white">Homeowner</h3>
                   <div className="mt-3 flex items-baseline gap-1.5">
-                    <span className="text-4xl font-bold text-white">$100</span>
-                    <span className="text-slate-400 text-sm">/month</span>
+                    <span className="text-4xl font-bold text-white">Free</span>
+                    <span className="text-slate-400 text-sm">for 3 days</span>
                   </div>
+                  <p className="mt-2 text-slate-500 text-xs">
+                    Then $100/month. Cancel anytime before day 3.
+                  </p>
                   <p className="mt-3 text-slate-400 text-sm">
                     Everything you need to sell your home without an agent.
                   </p>
@@ -491,10 +498,10 @@ export default function LandingPage() {
               href="/homeowner"
               className="mt-10 inline-flex items-center gap-2.5 px-10 py-4 bg-white text-[#0A0F1E] text-base font-semibold rounded-2xl hover:bg-slate-100 transition-all shadow-[0_0_40px_rgba(255,255,255,0.1)]"
             >
-              Start My Home Sale — $100/mo
+              Start Free — 3-Day Trial
               <ArrowRight size={18} />
             </Link>
-            <p className="mt-4 text-slate-500 text-sm">Cancel anytime. No long-term commitment.</p>
+            <p className="mt-4 text-slate-500 text-sm">Free for 3 days, then $100/mo. Cancel anytime.</p>
           </div>
         </section>
 
