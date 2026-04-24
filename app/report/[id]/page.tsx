@@ -7,11 +7,13 @@ import Footer from '@/components/Footer';
 import ReportViewer from '@/components/ReportViewer';
 import type { Report } from '@/types';
 
+type AccessStatus = 'trialing' | 'active' | 'expired' | 'none';
+
 export default function ReportPage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [report, setReport] = useState<Report | null>(null);
+  const [report, setReport] = useState<(Report & { access_status?: AccessStatus }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [gateUnlocked, setGateUnlocked] = useState(false);
@@ -190,8 +192,59 @@ export default function ReportPage() {
             </div>
           )}
 
-          {/* Report content */}
-          {!loading && !error && report && gateUnlocked && <ReportViewer report={report} />}
+          {/* Subscription expired — lock full report behind resubscribe gate */}
+          {!loading && !error && report && gateUnlocked && report.access_status === 'expired' && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="max-w-lg w-full bg-white rounded-2xl border border-slate-200 p-10 shadow-sm text-center">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-5">
+                  <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-2">
+                  Your report is locked
+                </h2>
+                <p className="text-slate-500 mb-1 text-sm">
+                  Your subscription ended. Resubscribe for $100/mo to regain full access to your
+                </p>
+                <p className="text-slate-900 font-semibold mb-6 text-sm">
+                  {report.property_address}, {report.property_city} report
+                </p>
+                <a
+                  href="/homeowner"
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-[#0A0F1E] text-white font-semibold rounded-xl hover:bg-slate-800 transition-colors text-sm"
+                >
+                  Resubscribe — $100/mo
+                </a>
+                <p className="mt-4 text-xs text-slate-400">
+                  Selling a home is a multi-month process — keep your tools on hand.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Report content (full access: trialing, active, or sub hasn't loaded yet) */}
+          {!loading && !error && report && gateUnlocked && report.access_status !== 'expired' && (
+            <>
+              {report.access_status === 'trialing' && (
+                <div className="mb-6 flex items-center justify-between gap-4 px-5 py-3 rounded-xl bg-blue-50 border border-blue-100">
+                  <div className="flex items-center gap-3 text-sm text-blue-900">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">i</span>
+                    <span>
+                      You&apos;re on the free trial. Keep access after day 3 by staying subscribed — $100/mo.
+                    </span>
+                  </div>
+                  <a
+                    href="/homeowner"
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 whitespace-nowrap"
+                  >
+                    Manage subscription
+                  </a>
+                </div>
+              )}
+              <ReportViewer report={report} />
+            </>
+          )}
         </div>
       </main>
       <Footer />
