@@ -6,6 +6,7 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ReportViewer from '@/components/ReportViewer';
 import ShareListingBanner from '@/components/ShareListingBanner';
+import ManageSubscriptionButton from '@/components/ManageSubscriptionButton';
 import type { Report } from '@/types';
 
 type AccessStatus = 'trialing' | 'active' | 'expired' | 'none';
@@ -232,20 +233,35 @@ export default function ReportPage() {
                   <div className="flex items-center gap-3 text-sm text-blue-900">
                     <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">i</span>
                     <span>
-                      You&apos;re on the free trial. Keep access after day 3 by staying subscribed — $100/mo.
+                      You&apos;re on the free trial. Cancel before day 3 to avoid the $100/mo charge.
                     </span>
                   </div>
-                  <a
-                    href="/homeowner"
-                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 whitespace-nowrap"
+                  <ManageSubscriptionButton
+                    reportId={id}
+                    className="text-xs font-semibold text-blue-700 hover:text-blue-900 underline underline-offset-2 whitespace-nowrap disabled:opacity-60"
                   >
-                    Manage subscription
-                  </a>
+                    Manage / Cancel
+                  </ManageSubscriptionButton>
                 </div>
               )}
               {/* Public listing share link — surfaced for both homeowners and agents */}
               <ShareListingBanner reportId={id} />
               <ReportViewer report={report} accessStatus={report.access_status} />
+
+              {/* Account footer — gives homeowners a clear way to manage / cancel */}
+              {report.customer_type === 'homeowner' && (
+                <div className="mt-10 pt-6 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                  <p>
+                    Need help? Email{' '}
+                    <a href="mailto:hello@listwithai.io" className="text-blue-600 hover:text-blue-700">
+                      hello@listwithai.io
+                    </a>
+                  </p>
+                  <ManageSubscriptionButton reportId={id}>
+                    Manage subscription / Cancel
+                  </ManageSubscriptionButton>
+                </div>
+              )}
             </>
           )}
         </div>
