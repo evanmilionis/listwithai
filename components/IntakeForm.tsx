@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef } from 'react';
+import UrlIngestBar from '@/components/UrlIngestBar';
 import { cn, getConditionLabel } from '@/lib/utils';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -406,6 +407,29 @@ export default function IntakeForm({
 
   const renderStep1 = () => (
     <div className="space-y-5">
+      <UrlIngestBar
+        onImport={(data) => {
+          setForm((prev) => ({
+            ...prev,
+            property_address:   data.property_address   ?? prev.property_address,
+            property_city:      data.property_city      ?? prev.property_city,
+            property_state:     data.property_state     ?? prev.property_state,
+            property_zip:       data.property_zip       ?? prev.property_zip,
+            property_type:      (data.property_type as IntakeFormData['property_type']) ?? prev.property_type,
+            beds:               data.beds              ?? prev.beds,
+            baths:              data.baths             ?? prev.baths,
+            sqft:               data.sqft              ?? prev.sqft,
+            year_built:         data.year_built        ?? prev.year_built,
+            lot_size:           data.lot_size          ?? prev.lot_size,
+            asking_price:       data.asking_price      ?? prev.asking_price,
+            hoa_monthly_amount: data.hoa_monthly_amount ?? prev.hoa_monthly_amount,
+            home_features:      data.home_features     ?? prev.home_features,
+          }));
+          if (data.asking_price) {
+            setPriceDisplay(`$${data.asking_price.toLocaleString()}`);
+          }
+        }}
+      />
       <Input
         id="property_address"
         label="Full Street Address"
