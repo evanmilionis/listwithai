@@ -16,7 +16,7 @@ import { createServiceClient } from '@/lib/supabase';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function optOut(leadId: string, req: NextRequest): Promise<boolean> {
+async function optOut(leadId: string, _req: NextRequest): Promise<boolean> {
   try {
     const supabase = createServiceClient();
     const { data: lead } = await supabase
