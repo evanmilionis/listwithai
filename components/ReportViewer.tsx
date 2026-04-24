@@ -8,6 +8,7 @@ import Disclaimer from '@/components/Disclaimer';
 import MLSReferral from '@/components/MLSReferral';
 import AttorneyCards from '@/components/AttorneyCards';
 import StagingTab from '@/components/StagingTab';
+import TrialGate from '@/components/TrialGate';
 import {
   Copy,
   Download,
@@ -42,7 +43,12 @@ interface ReportViewerProps {
   report: Report;
   agentMode?: boolean;
   stagingCredits?: number;
+  /** Access tier for this viewer. When 'trialing', non-preview tabs are blur-locked. */
+  accessStatus?: 'trialing' | 'active' | 'expired' | 'none';
 }
+
+// Tabs visible during the 3-day trial (everything else is locked behind an upgrade overlay)
+const TRIAL_PREVIEW_TABS = new Set(['summary', 'pricing', 'listing']);
 
 const TABS = [
   { key: 'summary', label: 'Summary', icon: Home },
@@ -1299,7 +1305,9 @@ function NextStepsPanel({ report }: { report: Report }) {
 /* ------------------------------------------------------------------ */
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
-export default function ReportViewer({ report, agentMode = false, stagingCredits = 0 }: ReportViewerProps) {
+export default function ReportViewer({ report, agentMode = false, stagingCredits = 0, accessStatus = 'active' }: ReportViewerProps) {
+  const trialGateActive = accessStatus === 'trialing';
+  const isTabLocked = (key: string) => trialGateActive && !TRIAL_PREVIEW_TABS.has(key);
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
   // Hide MLS tab for agent-mode AND for agent-generated reports viewed by clients
   const isAgentReport = agentMode || report.customer_type === 'agent';
@@ -1670,6 +1678,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
           {filteredTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.key;
+            const locked = isTabLocked(tab.key);
             return (
               <button
                 key={tab.key}
@@ -1683,6 +1692,7 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
               >
                 <Icon className="h-4 w-4" />
                 {tab.label}
+                {locked && <span className="ml-1 text-[10px] font-semibold text-blue-600">🔒</span>}
               </button>
             );
           })}
@@ -1708,13 +1718,33 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
       {/* Tab content */}
       <div>
         {activeTab === 'summary' && <PropertySummary report={report} />}
-        {activeTab === 'timeline' && <SellingTimeline report={report} />}
-        {activeTab === 'improvements' && <ImprovementRecommendations report={report} />}
+        {activeTab === 'timeline' && (
+          <TrialGate locked={isTabLocked('timeline')} tabLabel="Timeline">
+            <SellingTimeline report={report} />
+          </TrialGate>
+        )}
+        {activeTab === 'improvements' && (
+          <TrialGate locked={isTabLocked('improvements')} tabLabel="Improvements">
+            <ImprovementRecommendations report={report} />
+          </TrialGate>
+        )}
         {activeTab === 'pricing' && <PricingAnalysis report={report} />}
         {activeTab === 'listing' && <ListingCopy report={report} />}
-        {activeTab === 'legal' && <LegalPackage report={report} />}
-        {activeTab === 'mls' && <MLSAccess />}
-        {activeTab === 'attorneys' && <AttorneysTab city={report.property_city} state={report.property_state} />}
+        {activeTab === 'legal' && (
+          <TrialGate locked={isTabLocked('legal')} tabLabel="Legal Package">
+            <LegalPackage report={report} />
+          </TrialGate>
+        )}
+        {activeTab === 'mls' && (
+          <TrialGate locked={isTabLocked('mls')} tabLabel="MLS Access">
+            <MLSAccess />
+          </TrialGate>
+        )}
+        {activeTab === 'attorneys' && (
+          <TrialGate locked={isTabLocked('attorneys')} tabLabel="Attorneys">
+            <AttorneysTab city={report.property_city} state={report.property_state} />
+          </TrialGate>
+        )}
 
         {activeTab === 'social' && socialMedia && (
           <div className="space-y-6">
@@ -2037,13 +2067,19 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
         )}
 
         {activeTab === 'staging' && (
-          <StagingTab
-            reportId={report.id}
-            stagingCredits={stagingCredits}
-          />
+          <TrialGate locked={isTabLocked('staging')} tabLabel="Virtual Staging">
+            <StagingTab
+              reportId={report.id}
+              stagingCredits={stagingCredits}
+            />
+          </TrialGate>
         )}
 
-        {activeTab === 'offer' && <OfferReviewTab report={report} />}
+        {activeTab === 'offer' && (
+          <TrialGate locked={isTabLocked('offer')} tabLabel="Offer Review">
+            <OfferReviewTab report={report} />
+          </TrialGate>
+        )}
       </div>
 
       {/* Support banner */}

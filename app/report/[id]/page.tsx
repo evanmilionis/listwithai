@@ -245,7 +245,7 @@ export default function ReportPage() {
               )}
               {/* Public listing share link — surfaced for both homeowners and agents */}
               <ShareListingBanner reportId={id} />
-              <ReportViewer report={report} />
+              <ReportViewer report={report} accessStatus={report.access_status} />
             </>
           )}
         </div>
