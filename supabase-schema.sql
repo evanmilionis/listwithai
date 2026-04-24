@@ -80,6 +80,24 @@ CREATE TABLE leads (
 CREATE INDEX idx_leads_email ON leads(email);
 CREATE INDEX idx_leads_converted ON leads(converted);
 
+-- Buyer inquiries (public property page contact submissions)
+CREATE TABLE buyer_inquiries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ DEFAULT now(),
+  report_id UUID REFERENCES reports(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  pre_approved BOOLEAN,
+  financing_type TEXT,
+  message TEXT,
+  contacted BOOLEAN DEFAULT false,
+  contacted_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_buyer_inquiries_report_id ON buyer_inquiries(report_id);
+CREATE INDEX idx_buyer_inquiries_created_at ON buyer_inquiries(created_at DESC);
+
 -- RLS policies
 ALTER TABLE reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE agent_subscriptions ENABLE ROW LEVEL SECURITY;

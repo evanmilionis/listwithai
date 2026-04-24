@@ -64,6 +64,21 @@ export interface HomeownerSubscription {
   report_id: string | null;
 }
 
+// Buyer inquiry submitted through a public /home/[id] listing page
+export interface BuyerInquiry {
+  id: string;
+  created_at: string;
+  report_id: string | null;
+  name: string;
+  email: string;
+  phone: string | null;
+  pre_approved: boolean | null;
+  financing_type: string | null;
+  message: string | null;
+  contacted: boolean;
+  contacted_at: string | null;
+}
+
 // Lead (sales funnel / abandoned cart)
 export interface Lead {
   id: string;

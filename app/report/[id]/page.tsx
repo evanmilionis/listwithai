@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import ReportViewer from '@/components/ReportViewer';
+import ShareListingBanner from '@/components/ShareListingBanner';
 import type { Report } from '@/types';
 
 type AccessStatus = 'trialing' | 'active' | 'expired' | 'none';
@@ -242,6 +243,8 @@ export default function ReportPage() {
                   </a>
                 </div>
               )}
+              {/* Public listing share link — surfaced for both homeowners and agents */}
+              <ShareListingBanner reportId={id} />
               <ReportViewer report={report} />
             </>
           )}
