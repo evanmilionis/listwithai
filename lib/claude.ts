@@ -14,7 +14,6 @@ import type {
   MarketSnapshotModule,
 } from '@/types';
 import { getConditionLabel } from '@/lib/utils';
-// Legal templates removed — legal module now uses a single Claude call for state-specific guidance
 
 // ---------------------------------------------------------------------------
 // Client (singleton — one instance for the entire report generation run)
@@ -33,12 +32,13 @@ function getAnthropic(): Anthropic {
   return _anthropic;
 }
 
-const MODEL = 'claude-sonnet-4-6';
+// Model routing
+// Sonnet 4.6 for quality-critical modules (pricing, legal, listing copy, improvements, buyer CMA, market snapshot)
+// Haiku 4.5 for lower-stakes modules (timeline, social media, open house) — ~35-45% cost reduction
+const MODEL_SONNET = 'claude-sonnet-4-6';
+const MODEL_HAIKU  = 'claude-haiku-4-5-20251001';
 
-// Per-module token ceilings.
-// These are starting limits — callClaude() auto-bumps by 50% on truncation.
-// Note: max_tokens only charges for tokens actually GENERATED, not reserved,
-// so setting these a bit higher than needed has zero cost impact.
+// Per-module token ceilings. callClaude() auto-bumps by 50% on truncation.
 const MODULE_MAX_TOKENS = {
   timeline:       12000,
   improvements:   10000,
@@ -52,21 +52,13 @@ const MODULE_MAX_TOKENS = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// Shared property context block (CACHED across all 5 module calls)
-//
-// This is the key cost lever. All 5 modules receive identical property data.
-// By marking it cache_control: ephemeral, calls 2-5 pay ~10% of input cost
-// for this block instead of 100%. Cache TTL is 5 min — well within the
-// sequential run window.
+// Shared property context block (CACHED across all module calls)
 // ---------------------------------------------------------------------------
 
 export interface PropertyContext {
-  /** Pre-built, trimmed string sent as the first (cached) user content block */
   text: string;
 }
 
-/** Trim Rentcast payload to only the fields Claude actually uses.
- *  Returns a safe object even when all Rentcast endpoints returned null. */
 function trimRentcast(r: RentcastData) {
   return {
     estimatedValue: r.valuation?.price ?? null,
@@ -94,7 +86,6 @@ function trimRentcast(r: RentcastData) {
   };
 }
 
-/** Trim Google Places payload to only the fields Claude actually uses */
 function trimAmenities(a: NearbyAmenities | null) {
   if (!a) return null;
   const pick = (item: { name?: string; distance_miles?: number } | null | undefined) =>
@@ -109,16 +100,11 @@ function trimAmenities(a: NearbyAmenities | null) {
   };
 }
 
-/**
- * Build the shared property context string once, before running any modules.
- * Pass the result into every generate* call so the cached block is identical.
- */
 export function buildPropertyContext(
   report: Report,
   rentcastData: RentcastData,
   amenities: NearbyAmenities | null
 ): PropertyContext {
-  // Extract form metadata if stored in report_output
   const formMeta = (report.report_output as unknown as Record<string, unknown>)?.form_metadata as Record<string, unknown> | undefined;
 
   const trimmedRentcast = trimRentcast(rentcastData);
@@ -152,7 +138,6 @@ export function buildPropertyContext(
     },
     rentcast:   trimmedRentcast,
     amenities:  trimmedAmenities,
-    // Tell Claude explicitly when external data is missing so it adapts
     _dataFlags: {
       hasValuation: !!rentcastData.valuation,
       hasComps:     (rentcastData.valuation?.comparables?.length ?? 0) > 0,
@@ -160,104 +145,149 @@ export function buildPropertyContext(
       hasAmenities: !!amenities,
     },
     today:      new Date().toISOString().split('T')[0],
-  }, null, 0); // no pretty-print — saves tokens
+  }, null, 0);
 
   return { text };
 }
 
 // ---------------------------------------------------------------------------
-// Core callClaude — uses prompt caching on both system + property context
+// Core callClaude — uses forced tool-use for reliable structured JSON output
+//
+// Instead of prompting "return raw JSON" and regex-parsing the response,
+// we define a tool with a JSON schema and force Claude to call it. The SDK
+// returns the structured input directly, eliminating all parsing failures.
 // ---------------------------------------------------------------------------
 
-async function callClaude(
-  systemPrompt: string,
-  propertyContext: PropertyContext,
-  modulePrompt: string,
-  maxTokens: number,
-  moduleName: string = 'unknown'
-): Promise<unknown | null> {
+interface CallClaudeOpts {
+  systemPrompt: string;
+  propertyContext: PropertyContext;
+  modulePrompt: string;
+  maxTokens: number;
+  moduleName: string;
+  outputSchema: Record<string, unknown>;
+  model?: string;
+  enableWebSearch?: boolean;
+}
+
+async function callClaude(opts: CallClaudeOpts): Promise<unknown | null> {
+  const {
+    systemPrompt,
+    propertyContext,
+    modulePrompt,
+    moduleName,
+    outputSchema,
+    model = MODEL_SONNET,
+    enableWebSearch = false,
+  } = opts;
+  let maxTokens = opts.maxTokens;
+
   const anthropic = getAnthropic();
+
+  const returnTool = {
+    name: 'return_module',
+    description: `Return the structured ${moduleName} module output.`,
+    input_schema: outputSchema,
+  };
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const message = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: maxTokens,
+      // Build tools list — optionally include web search
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const tools: any[] = [returnTool];
+      if (enableWebSearch) {
+        tools.push({
+          type: 'web_search_20250305',
+          name: 'web_search',
+          max_uses: 3,
+        });
+      }
 
-        // Cache the system prompt — identical across retries
-        system: [
-          {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const messages: any[] = [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `PROPERTY CONTEXT (structured data for this report):\n${propertyContext.text}`,
+              cache_control: { type: 'ephemeral' },
+            },
+            { type: 'text', text: modulePrompt },
+          ],
+        },
+      ];
+
+      // Multi-turn loop to handle web_search tool calls before final return_module
+      const MAX_TURNS = enableWebSearch ? 5 : 1;
+      for (let turn = 0; turn < MAX_TURNS; turn++) {
+        const message = await anthropic.messages.create({
+          model,
+          max_tokens: maxTokens,
+          system: [{
             type: 'text',
-            text: systemPrompt + '\n\nIMPORTANT: Return ONLY raw JSON. Do NOT wrap in markdown code blocks. Do NOT use ```json. Start your response with { and end with }. Keep your total response under 8000 characters. Be concise in all string values — favor clarity over length.',
+            text: systemPrompt,
             cache_control: { type: 'ephemeral' },
-          },
-        ],
+          }],
+          tools,
+          tool_choice: enableWebSearch
+            ? { type: 'auto' }
+            : { type: 'tool', name: 'return_module' },
+          messages,
+        });
 
-        messages: [
-          {
-            role: 'user',
-            content: [
-              // Block 1: shared property data — CACHED across all 5 module calls
-              {
-                type: 'text',
-                text: `PROPERTY CONTEXT (structured data for this report):\n${propertyContext.text}`,
-                cache_control: { type: 'ephemeral' },
-              },
-              // Block 2: module-specific instruction — NOT cached (unique per module)
-              {
-                type: 'text',
-                text: modulePrompt,
-              },
-            ],
-          },
-        ],
-      });
-
-      // Check for refusal or empty response
-      if (message.stop_reason === 'end_turn' && message.content.length === 0) {
-        console.error(`[${moduleName}] attempt ${attempt + 1}: empty response from Claude`);
-        continue;
-      }
-
-      const textBlock = message.content.find((b) => b.type === 'text');
-      if (!textBlock || textBlock.type !== 'text') {
-        console.error(`[${moduleName}] attempt ${attempt + 1}: no text block in response. stop_reason=${message.stop_reason}`);
-        continue;
-      }
-
-      // ── Truncation detection ──────────────────────────────────────
-      // If stop_reason is 'max_tokens', the JSON is incomplete — parsing
-      // will always fail. Retry with a higher ceiling and a "be concise"
-      // nudge so the model fits within the limit.
-      if (message.stop_reason === 'max_tokens') {
-        console.warn(`[${moduleName}] attempt ${attempt + 1}: TRUNCATED (hit max_tokens=${maxTokens}, output=${textBlock.text.length} chars). Retrying with +50% tokens and conciseness nudge.`);
-        // Bump limit by 50% for the next attempt (capped at 16384)
-        maxTokens = Math.min(Math.ceil(maxTokens * 1.5), 16384);
-        // Append conciseness instruction for next attempt
-        if (!modulePrompt.includes('TOKEN BUDGET WARNING')) {
-          modulePrompt += '\n\nTOKEN BUDGET WARNING: Your previous response was too long and got cut off. Be MORE CONCISE. Use shorter descriptions. Limit each task description to 1-2 sentences. Do NOT sacrifice required JSON fields — just use fewer words in string values.';
+        // Check for return_module call first (terminal)
+        const returnCall = message.content.find(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (b: any) => b.type === 'tool_use' && b.name === 'return_module'
+        );
+        if (returnCall && returnCall.type === 'tool_use') {
+          return returnCall.input;
         }
-        continue;
+
+        // Handle truncation
+        if (message.stop_reason === 'max_tokens') {
+          console.warn(`[${moduleName}] attempt ${attempt + 1} turn ${turn + 1}: truncated (max_tokens=${maxTokens})`);
+          maxTokens = Math.min(Math.ceil(maxTokens * 1.5), 16384);
+          break; // restart outer attempt with higher token budget
+        }
+
+        // If web search is enabled, loop: append assistant response + any tool_results
+        // The SDK server-side handles web_search tool execution automatically in
+        // newer API versions — we just pass through by appending the assistant message.
+        if (enableWebSearch && message.stop_reason === 'tool_use') {
+          messages.push({ role: 'assistant', content: message.content });
+          // For server-executed tools (like web_search) the tool_result blocks are
+          // already embedded in the response. Continue the loop and ask for final answer.
+          messages.push({
+            role: 'user',
+            content: [{
+              type: 'text',
+              text: 'Now call return_module with the final structured output based on your research.',
+            }],
+          });
+          continue;
+        }
+
+        console.error(`[${moduleName}] attempt ${attempt + 1} turn ${turn + 1}: no return_module block. stop_reason=${message.stop_reason}`);
+        break;
       }
-
-      const parsed = extractJSON(textBlock.text);
-      if (parsed) return parsed;
-
-      console.error(`[${moduleName}] attempt ${attempt + 1}: JSON parse failed. stop_reason=${message.stop_reason}, length=${textBlock.text.length}`);
-      console.error(`[${moduleName}] first 300 chars:`, textBlock.text.substring(0, 300));
-      console.error(`[${moduleName}] last 200 chars:`, textBlock.text.substring(textBlock.text.length - 200));
     } catch (error: unknown) {
       const errMsg = error instanceof Error ? error.message : String(error);
       const statusCode = (error as { status?: number })?.status;
       console.error(`[${moduleName}] attempt ${attempt + 1} error (status=${statusCode}): ${errMsg}`);
 
-      // Don't retry on auth/model errors — they won't resolve
+      // If web search is the culprit (e.g., not enabled on account), disable it
+      // and retry once without it rather than failing the module entirely.
+      if (opts.enableWebSearch && /web_search|tool.*not.*available|invalid.*tool/i.test(errMsg)) {
+        console.warn(`[${moduleName}] web search unavailable — falling back without it`);
+        return callClaude({ ...opts, enableWebSearch: false });
+      }
+
       if (statusCode === 401 || statusCode === 403 || statusCode === 404) {
         console.error(`[${moduleName}] non-retryable error (${statusCode}), aborting`);
         return null;
       }
 
-      // Back off before retry on rate limits
       if (statusCode === 429 && attempt < 2) {
         const wait = (attempt + 1) * 2000;
         console.log(`[${moduleName}] rate limited, waiting ${wait}ms before retry`);
@@ -271,52 +301,304 @@ async function callClaude(
 }
 
 // ---------------------------------------------------------------------------
-// JSON extraction helper (unchanged — already solid)
+// JSON Schemas for each module (enforced via tool-use)
 // ---------------------------------------------------------------------------
 
-function extractJSON(text: string): unknown | null {
-  // Strip markdown code fences if present
-  const cleaned = text.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '');
+const timelineSchema = {
+  type: 'object',
+  required: ['timeline_summary', 'recommended_list_date', 'phases', 'local_tips'],
+  properties: {
+    timeline_summary: { type: 'string' },
+    recommended_list_date: { type: 'string' },
+    recommended_list_day: { type: 'string' },
+    estimated_close_date: { type: 'string' },
+    phases: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['phase_number', 'label', 'duration', 'tasks'],
+        properties: {
+          phase_number: { type: 'integer' },
+          label: { type: 'string' },
+          duration: { type: 'string' },
+          tasks: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['task', 'description', 'priority', 'estimated_hours'],
+              properties: {
+                task: { type: 'string' },
+                description: { type: 'string' },
+                priority: { type: 'string', enum: ['high', 'medium', 'low'] },
+                estimated_hours: { type: 'number' },
+              },
+            },
+          },
+        },
+      },
+    },
+    local_tips: { type: 'array', items: { type: 'string' } },
+    seasonal_note: { type: 'string' },
+  },
+};
 
-  const start = cleaned.indexOf('{');
-  const end = cleaned.lastIndexOf('}');
-  if (start !== -1 && end !== -1 && end > start) {
-    let jsonStr = cleaned.substring(start, end + 1);
-    try {
-      return JSON.parse(jsonStr);
-    } catch {
-      // Remove trailing commas before } or ]
-      jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
-      try {
-        return JSON.parse(jsonStr);
-      } catch {
-        // Remove control characters (keep newlines/tabs)
-        jsonStr = jsonStr.replace(/[\x00-\x1F\x7F]/g, (ch) =>
-          ch === '\n' || ch === '\r' || ch === '\t' ? ch : ''
-        );
-        try {
-          return JSON.parse(jsonStr);
-        } catch {
-          // Replace unescaped newlines inside string values
-          jsonStr = jsonStr.replace(/"(?:[^"\\]|\\.)*"/g, (match) =>
-            match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
-          );
-          try {
-            return JSON.parse(jsonStr);
-          } catch (e) {
-            console.error('Failed to parse JSON:', (e as Error).message, jsonStr.substring(0, 300));
-            return null;
-          }
-        }
-      }
-    }
-  }
-  console.error('No JSON object found. First 200 chars:', text.substring(0, 200));
-  return null;
-}
+const improvementsSchema = {
+  type: 'object',
+  required: ['summary', 'recommendations', 'things_to_avoid', 'staging_tips'],
+  properties: {
+    summary: { type: 'string' },
+    total_estimated_investment: { type: 'string' },
+    potential_value_increase: { type: 'string' },
+    recommendations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['area', 'recommendation', 'why', 'estimated_cost', 'estimated_roi', 'priority', 'diy_friendly', 'time_to_complete'],
+        properties: {
+          area: { type: 'string' },
+          recommendation: { type: 'string' },
+          why: { type: 'string' },
+          estimated_cost: { type: 'string' },
+          estimated_roi: { type: 'string' },
+          priority: { type: 'integer' },
+          diy_friendly: { type: 'boolean' },
+          time_to_complete: { type: 'string' },
+        },
+      },
+    },
+    things_to_avoid: { type: 'array', items: { type: 'string' } },
+    staging_tips: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const pricingSchema = {
+  type: 'object',
+  required: ['pricing_summary', 'recommended_list_price', 'price_range', 'comparable_analysis', 'market_context', 'price_reduction_triggers'],
+  properties: {
+    pricing_summary: { type: 'string' },
+    recommended_list_price: { type: 'number' },
+    price_range: {
+      type: 'object',
+      required: ['aggressive', 'conservative'],
+      properties: {
+        aggressive: { type: 'number' },
+        conservative: { type: 'number' },
+      },
+    },
+    price_per_sqft: { type: 'number' },
+    market_avg_ppsf: { type: 'number' },
+    owner_price_assessment: { type: 'string' },
+    days_on_market_prediction: { type: 'string' },
+    negotiation_floor: { type: 'number' },
+    pricing_strategy: { type: 'string' },
+    comparable_analysis: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          address: { type: 'string' },
+          sale_price: { type: 'number' },
+          sqft: { type: 'number' },
+          ppsf: { type: 'number' },
+          beds: { type: 'number' },
+          baths: { type: 'number' },
+          sale_date: { type: 'string' },
+          dom: { type: 'number' },
+          distance: { type: 'string' },
+          relevance: { type: 'string' },
+        },
+      },
+    },
+    market_context: { type: 'string' },
+    price_reduction_triggers: { type: 'array', items: { type: 'string' } },
+  },
+};
+
+const listingSchema = {
+  type: 'object',
+  required: ['headline', 'full_description', 'short_description', 'bullet_highlights', 'seo_keywords'],
+  properties: {
+    headline: { type: 'string' },
+    tagline: { type: 'string' },
+    full_description: { type: 'string' },
+    short_description: { type: 'string' },
+    bullet_highlights: { type: 'array', items: { type: 'string' } },
+    open_house_description: { type: 'string' },
+    seo_keywords: { type: 'array', items: { type: 'string' } },
+    buyer_persona_targeted: { type: 'string' },
+    lifestyle_angle: { type: 'string' },
+  },
+};
+
+const legalSchema = {
+  type: 'object',
+  required: ['disclaimer', 'required_documents', 'state_disclosures', 'key_clauses_explained', 'closing_costs', 'attorney_referral'],
+  properties: {
+    disclaimer: { type: 'string' },
+    attorney_referral_note: { type: 'string' },
+    required_documents: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name', 'description', 'why_needed', 'where_to_get'],
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          why_needed: { type: 'string' },
+          where_to_get: { type: 'string' },
+        },
+      },
+    },
+    state_disclosures: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['name', 'description', 'statute_reference'],
+        properties: {
+          name: { type: 'string' },
+          description: { type: 'string' },
+          statute_reference: { type: 'string' },
+        },
+      },
+    },
+    key_clauses_explained: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['clause', 'plain_english'],
+        properties: {
+          clause: { type: 'string' },
+          plain_english: { type: 'string' },
+        },
+      },
+    },
+    closing_costs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['item', 'typical_range', 'paid_by'],
+        properties: {
+          item: { type: 'string' },
+          typical_range: { type: 'string' },
+          paid_by: { type: 'string', enum: ['Seller', 'Buyer', 'Negotiable'] },
+        },
+      },
+    },
+    attorney_referral: {
+      type: 'object',
+      required: ['intro', 'what_to_ask_them', 'typical_cost', 'when_to_call'],
+      properties: {
+        intro: { type: 'string' },
+        what_to_ask_them: { type: 'array', items: { type: 'string' } },
+        typical_cost: { type: 'string' },
+        when_to_call: { type: 'string' },
+      },
+    },
+  },
+};
+
+const socialMediaSchema = {
+  type: 'object',
+  required: ['instagram_caption', 'instagram_hashtags', 'facebook_post', 'twitter_post', 'linkedin_post', 'short_form_video_script', 'email_blast'],
+  properties: {
+    instagram_caption: { type: 'string' },
+    instagram_hashtags: { type: 'array', items: { type: 'string' } },
+    facebook_post: { type: 'string' },
+    twitter_post: { type: 'string' },
+    linkedin_post: { type: 'string' },
+    short_form_video_script: { type: 'string' },
+    email_blast: { type: 'string' },
+  },
+};
+
+const buyerCMASchema = {
+  type: 'object',
+  required: ['executive_summary', 'property_highlights', 'comparable_sales', 'market_position', 'value_justification', 'investment_outlook', 'neighborhood_highlights', 'price_per_sqft_analysis'],
+  properties: {
+    executive_summary: { type: 'string' },
+    property_highlights: { type: 'array', items: { type: 'string' } },
+    comparable_sales: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          address: { type: 'string' },
+          sale_price: { type: 'number' },
+          sqft: { type: 'number' },
+          ppsf: { type: 'number' },
+          beds: { type: 'number' },
+          baths: { type: 'number' },
+          sale_date: { type: 'string' },
+          condition_comparison: { type: 'string' },
+          price_adjustment: { type: 'string' },
+        },
+      },
+    },
+    market_position: { type: 'string' },
+    value_justification: { type: 'string' },
+    investment_outlook: { type: 'string' },
+    neighborhood_highlights: { type: 'array', items: { type: 'string' } },
+    price_per_sqft_analysis: { type: 'string' },
+  },
+};
+
+const openHouseSchema = {
+  type: 'object',
+  required: ['property_fact_sheet', 'feature_highlights', 'neighborhood_info', 'agent_talking_points', 'objection_handlers', 'follow_up_email_template'],
+  properties: {
+    property_fact_sheet: { type: 'string' },
+    feature_highlights: { type: 'array', items: { type: 'string' } },
+    neighborhood_info: { type: 'string' },
+    agent_talking_points: { type: 'array', items: { type: 'string' } },
+    objection_handlers: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['objection', 'response'],
+        properties: {
+          objection: { type: 'string' },
+          response: { type: 'string' },
+        },
+      },
+    },
+    follow_up_email_template: { type: 'string' },
+  },
+};
+
+const marketSnapshotSchema = {
+  type: 'object',
+  required: ['market_summary', 'inventory_level', 'market_trend', 'buyer_vs_seller_market', 'price_trend_narrative', 'best_time_to_list', 'key_insights'],
+  properties: {
+    market_summary: { type: 'string' },
+    median_price: { type: 'number' },
+    avg_price_per_sqft: { type: 'number' },
+    avg_days_on_market: { type: 'number' },
+    inventory_level: { type: 'string' },
+    market_trend: { type: 'string', enum: ['Rising', 'Stable', 'Declining'] },
+    buyer_vs_seller_market: { type: 'string' },
+    price_trend_narrative: { type: 'string' },
+    best_time_to_list: { type: 'string' },
+    key_insights: { type: 'array', items: { type: 'string' } },
+    comparable_recent_sales: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          address: { type: 'string' },
+          price: { type: 'number' },
+          sqft: { type: 'number' },
+          beds: { type: 'number' },
+          baths: { type: 'number' },
+          sold_date: { type: 'string' },
+          dom: { type: 'number' },
+        },
+      },
+    },
+  },
+};
 
 // ---------------------------------------------------------------------------
-// Module 1 — Timeline
+// Module 1 — Timeline  (Haiku 4.5)
 // ---------------------------------------------------------------------------
 
 export async function generateTimeline(
@@ -327,52 +609,36 @@ export async function generateTimeline(
   const state = report.property_state || 'the property\'s state';
 
   const system =
-    'You are an expert real estate consultant creating a personalized home selling timeline. Be specific, practical, and market-aware for the property\'s state and region. Format output as structured JSON.';
+    'You are an expert real estate consultant creating a personalized home selling timeline. Be specific, practical, and market-aware for the property\'s state and region.';
 
-  const prompt = `Using the property context above, create a FSBO selling timeline organized by phase (not individual weeks).
+  const prompt = `Using the property context above, create a FSBO selling timeline organized by phase.
 
 The property is in ${state}. Provide advice specific to that state's market, laws, and buyer demographics.
 
-Note: Check _dataFlags — if market data is unavailable, use your knowledge of regional market norms for timeline estimates.
+Note: Check _dataFlags — if market data is unavailable, use your knowledge of regional market norms.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - Use 4-6 phases (e.g., "Pre-Listing Prep", "Active Marketing", "Offer & Negotiation", "Under Contract", "Closing"), NOT individual weeks
 - Each phase: 3-5 tasks MAX
 - Each task description: 1-2 sentences MAX (under 30 words)
 - timeline_summary: 2-3 sentences MAX
 - local_tips: exactly 4 tips
-- Keep total response under 3000 words
 
-Return JSON with this exact structure:
-{
-  "timeline_summary": "string (2-3 sentences)",
-  "recommended_list_date": "YYYY-MM-DD",
-  "recommended_list_day": "string",
-  "estimated_close_date": "YYYY-MM-DD",
-  "phases": [
-    {
-      "phase_number": 1,
-      "label": "string (e.g. Pre-Listing Prep)",
-      "duration": "string (e.g. Weeks 1-2)",
-      "tasks": [
-        {
-          "task": "string (short action item)",
-          "description": "string (1-2 sentences, under 30 words)",
-          "priority": "high|medium|low",
-          "estimated_hours": 0
-        }
-      ]
-    }
-  ],
-  "local_tips": ["string"],
-  "seasonal_note": "string"
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.timeline, 'timeline')) as TimelineModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.timeline,
+    moduleName: 'timeline',
+    outputSchema: timelineSchema,
+    model: MODEL_HAIKU,
+  })) as TimelineModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 2 — Improvements
+// Module 2 — Improvements  (Sonnet 4.6)
 // ---------------------------------------------------------------------------
 
 export async function generateImprovements(
@@ -389,41 +655,30 @@ export async function generateImprovements(
 
 The property is in ${state}. Provide advice specific to that state's market, climate, and buyer demographics.
 
-IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Acknowledge what the seller has already done and do NOT recommend improvements already completed.
+IMPORTANT: If the property context includes "otherImprovements" (e.g., pool added, new lanai, solar panels), factor those into your analysis. Do NOT recommend improvements already completed.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - summary: 2-3 sentences MAX
-- recommendations: exactly 5-7 items (not more)
-- Each "recommendation", "why" field: 1 sentence MAX
+- recommendations: exactly 5-7 items
+- Each "recommendation" and "why" field: 1 sentence MAX
 - things_to_avoid: exactly 3-4 items, 1 sentence each
 - staging_tips: exactly 3-4 items, 1 sentence each
 
-Return JSON with this exact structure:
-{
-  "summary": "string (2-3 sentences)",
-  "total_estimated_investment": "string",
-  "potential_value_increase": "string",
-  "recommendations": [
-    {
-      "area": "string",
-      "recommendation": "string (1 sentence)",
-      "why": "string (1 sentence)",
-      "estimated_cost": "string",
-      "estimated_roi": "string",
-      "priority": 1,
-      "diy_friendly": true,
-      "time_to_complete": "string"
-    }
-  ],
-  "things_to_avoid": ["string (1 sentence each, 3-4 items)"],
-  "staging_tips": ["string (1 sentence each, 3-4 items)"]
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.improvements, 'improvements')) as ImprovementsModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.improvements,
+    moduleName: 'improvements',
+    outputSchema: improvementsSchema,
+    model: MODEL_SONNET,
+  })) as ImprovementsModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 3 — Pricing Analysis
+// Module 3 — Pricing Analysis  (Sonnet 4.6)
 // ---------------------------------------------------------------------------
 
 export async function generatePricingAnalysis(
@@ -445,7 +700,7 @@ IMPORTANT: Check the _dataFlags in the context. If hasComps or hasMarket is fals
 - Note in pricing_summary that comp data was limited.
 - Do NOT fabricate comparable sales — leave comparable_analysis as an empty array.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - pricing_summary: 2-3 sentences MAX
 - owner_price_assessment: 1-2 sentences
 - pricing_strategy: 2-3 sentences MAX
@@ -453,40 +708,21 @@ STRICT OUTPUT CONSTRAINTS:
 - market_context: 2-3 sentences MAX
 - price_reduction_triggers: exactly 3-4 items, 1 sentence each
 
-Return JSON with this exact structure:
-{
-  "pricing_summary": "string (2-3 sentences)",
-  "recommended_list_price": 0,
-  "price_range": { "aggressive": 0, "conservative": 0 },
-  "price_per_sqft": 0,
-  "market_avg_ppsf": 0,
-  "owner_price_assessment": "string (1-2 sentences)",
-  "days_on_market_prediction": "string",
-  "negotiation_floor": 0,
-  "pricing_strategy": "string (2-3 sentences)",
-  "comparable_analysis": [
-    {
-      "address": "string",
-      "sale_price": 0,
-      "sqft": 0,
-      "ppsf": 0,
-      "beds": 0,
-      "baths": 0,
-      "sale_date": "string",
-      "dom": 0,
-      "distance": "string",
-      "relevance": "string (1 sentence)"
-    }
-  ],
-  "market_context": "string (2-3 sentences)",
-  "price_reduction_triggers": ["string (1 sentence each, 3-4 items)"]
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.pricing, 'pricing')) as PricingModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.pricing,
+    moduleName: 'pricing',
+    outputSchema: pricingSchema,
+    model: MODEL_SONNET,
+  })) as PricingModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 4 — Listing Copy
+// Module 4 — Listing Copy  (Sonnet 4.6)
 // ---------------------------------------------------------------------------
 
 export async function generateListingCopy(
@@ -504,37 +740,30 @@ export async function generateListingCopy(
 
 The property is in ${state}. Tailor the copy to that state's buyer demographics and lifestyle appeal.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - headline: under 15 words
-- full_description: 200-250 words MAX (not 350)
+- full_description: 200-250 words MAX
 - short_description: 50-75 words
 - bullet_highlights: exactly 8 items, each under 10 words
 - seo_keywords: exactly 6 keywords
 - buyer_persona_targeted: 1 sentence
 - lifestyle_angle: 1-2 sentences
 
-Return JSON with this exact structure:
-{
-  "headline": "string (under 15 words)",
-  "tagline": "string",
-  "full_description": "string (200-250 words MAX)",
-  "short_description": "string (50-75 words)",
-  "bullet_highlights": ["string (exactly 8 items, under 10 words each)"],
-  "open_house_description": "string (2-3 sentences)",
-  "seo_keywords": ["string (exactly 6)"],
-  "buyer_persona_targeted": "string (1 sentence)",
-  "lifestyle_angle": "string (1-2 sentences)"
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.listingCopy, 'listing')) as ListingModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.listingCopy,
+    moduleName: 'listing',
+    outputSchema: listingSchema,
+    model: MODEL_SONNET,
+  })) as ListingModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 5 — Legal Package
-//
-// Templates are pre-written in lib/legalTemplates.ts — variables are filled
-// at runtime. Claude only generates the plain-English clause explanations and
-// attorney referral advisory, which is a much smaller / faster call.
+// Module 5 — Legal Package  (Sonnet 4.6 + web search)
 // ---------------------------------------------------------------------------
 
 export async function generateLegalPackage(
@@ -545,61 +774,35 @@ export async function generateLegalPackage(
   const address = `${report.property_address}, ${report.property_city}, ${state} ${report.property_zip}`;
 
   const system =
-    'You are a real estate paralegal specializing in the property\'s state. Explain legal concepts in plain English for FSBO sellers. Be concise and practical. Return only raw JSON.';
+    'You are a real estate paralegal specializing in the property\'s state. Explain legal concepts in plain English for FSBO sellers. Be concise and practical. You have access to web search — use it to verify current state statute references and disclosure requirements.';
 
   const prompt = `For a FSBO home sale in ${state} at ${address}, provide state-specific legal guidance.
 
-The property is in ${state}. Provide advice specific to that state's real estate laws, disclosure requirements, and closing procedures.
+Use web search (up to 3 queries) to verify current ${state} real estate disclosure requirements, statute numbers, and closing procedures. Focus on primary-source references.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - required_documents: 4-6 documents, description/why_needed/where_to_get: 1-2 sentences each
-- state_disclosures: 3-5 disclosures with statute references
+- state_disclosures: 3-5 disclosures with current statute references
 - key_clauses_explained: exactly 5 clauses, plain_english: 1-2 sentences each
 - closing_costs: 5-8 items
 - attorney_referral: intro 1-2 sentences, what_to_ask_them exactly 4 items, typical_cost 1 sentence, when_to_call 1 sentence
 
-Return JSON:
-{
-  "disclaimer": "string",
-  "attorney_referral_note": "string",
-  "required_documents": [
-    {
-      "name": "string",
-      "description": "string (1-2 sentences)",
-      "why_needed": "string (1-2 sentences)",
-      "where_to_get": "string (1-2 sentences)"
-    }
-  ],
-  "state_disclosures": [
-    {
-      "name": "string",
-      "description": "string",
-      "statute_reference": "string"
-    }
-  ],
-  "key_clauses_explained": [
-    { "clause": "string", "plain_english": "string (1-2 sentences)" }
-  ],
-  "closing_costs": [
-    {
-      "item": "string",
-      "typical_range": "string",
-      "paid_by": "Seller|Buyer|Negotiable"
-    }
-  ],
-  "attorney_referral": {
-    "intro": "string (1-2 sentences)",
-    "what_to_ask_them": ["string (exactly 4 items)"],
-    "typical_cost": "string (1 sentence)",
-    "when_to_call": "string (1 sentence)"
-  }
-}`;
+After research, call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.legal, 'legal')) as LegalModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.legal,
+    moduleName: 'legal',
+    outputSchema: legalSchema,
+    model: MODEL_SONNET,
+    enableWebSearch: true,
+  })) as LegalModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 6 — Social Media
+// Module 6 — Social Media  (Haiku 4.5)
 // ---------------------------------------------------------------------------
 
 export async function generateSocialMedia(
@@ -617,7 +820,7 @@ export async function generateSocialMedia(
 
 The property is in ${state}. Tailor content to that state's buyer demographics and lifestyle appeal.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - instagram_caption: 100-150 words MAX
 - instagram_hashtags: exactly 10 hashtags
 - facebook_post: 80-100 words MAX
@@ -626,22 +829,21 @@ STRICT OUTPUT CONSTRAINTS:
 - short_form_video_script: 100 words MAX
 - email_blast: 100-150 words MAX
 
-Return JSON with this exact structure:
-{
-  "instagram_caption": "string (100-150 words)",
-  "instagram_hashtags": ["string (exactly 10)"],
-  "facebook_post": "string (80-100 words)",
-  "twitter_post": "string (under 280 chars)",
-  "linkedin_post": "string (80-100 words)",
-  "short_form_video_script": "string (100 words MAX)",
-  "email_blast": "string (100-150 words)"
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.socialMedia, 'socialMedia')) as SocialMediaModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.socialMedia,
+    moduleName: 'socialMedia',
+    outputSchema: socialMediaSchema,
+    model: MODEL_HAIKU,
+  })) as SocialMediaModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 7 — Buyer CMA
+// Module 7 — Buyer CMA  (Sonnet 4.6)
 // ---------------------------------------------------------------------------
 
 export async function generateBuyerCMA(
@@ -658,7 +860,7 @@ export async function generateBuyerCMA(
 
 The property is in ${state}. Provide advice specific to that state's market and buyer demographics.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - executive_summary: 2-3 sentences MAX
 - property_highlights: exactly 6 items, under 10 words each
 - comparable_sales: MAX 5 comps, condition_comparison and price_adjustment: 1 sentence each
@@ -668,35 +870,21 @@ STRICT OUTPUT CONSTRAINTS:
 - neighborhood_highlights: exactly 5 items, under 10 words each
 - price_per_sqft_analysis: 1-2 sentences MAX
 
-Return JSON with this exact structure:
-{
-  "executive_summary": "string (2-3 sentences)",
-  "property_highlights": ["string (exactly 6 items)"],
-  "comparable_sales": [
-    {
-      "address": "string",
-      "sale_price": 0,
-      "sqft": 0,
-      "ppsf": 0,
-      "beds": 0,
-      "baths": 0,
-      "sale_date": "string",
-      "condition_comparison": "string (1 sentence)",
-      "price_adjustment": "string (1 sentence)"
-    }
-  ],
-  "market_position": "string (2 sentences)",
-  "value_justification": "string (2-3 sentences)",
-  "investment_outlook": "string (2 sentences)",
-  "neighborhood_highlights": ["string (exactly 5 items)"],
-  "price_per_sqft_analysis": "string (1-2 sentences)"
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.buyerCMA, 'buyerCMA')) as BuyerCMAModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.buyerCMA,
+    moduleName: 'buyerCMA',
+    outputSchema: buyerCMASchema,
+    model: MODEL_SONNET,
+  })) as BuyerCMAModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 8 — Open House
+// Module 8 — Open House  (Haiku 4.5)
 // ---------------------------------------------------------------------------
 
 export async function generateOpenHouse(
@@ -714,7 +902,7 @@ export async function generateOpenHouse(
 
 The property is in ${state}. Tailor materials to that state's market and buyer demographics.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - property_fact_sheet: 150 words MAX (bullet-style, not paragraphs)
 - feature_highlights: exactly 8 items, under 10 words each
 - neighborhood_info: 3-4 sentences MAX
@@ -722,26 +910,21 @@ STRICT OUTPUT CONSTRAINTS:
 - objection_handlers: exactly 4 items, response: 1-2 sentences each
 - follow_up_email_template: 100 words MAX
 
-Return JSON with this exact structure:
-{
-  "property_fact_sheet": "string (150 words MAX, bullet-style)",
-  "feature_highlights": ["string (exactly 8 items)"],
-  "neighborhood_info": "string (3-4 sentences)",
-  "agent_talking_points": ["string (exactly 6 items)"],
-  "objection_handlers": [
-    {
-      "objection": "string",
-      "response": "string (1-2 sentences)"
-    }
-  ],
-  "follow_up_email_template": "string (100 words MAX)"
-}`;
+Call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.openHouse, 'openHouse')) as OpenHouseModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.openHouse,
+    moduleName: 'openHouse',
+    outputSchema: openHouseSchema,
+    model: MODEL_HAIKU,
+  })) as OpenHouseModule | null;
 }
 
 // ---------------------------------------------------------------------------
-// Module 9 — Market Snapshot
+// Module 9 — Market Snapshot  (Sonnet 4.6 + web search)
 // ---------------------------------------------------------------------------
 
 export async function generateMarketSnapshot(
@@ -752,45 +935,31 @@ export async function generateMarketSnapshot(
   const state = report.property_state || 'the property\'s state';
 
   const system =
-    'You are a real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual market data provided — do not fabricate statistics.';
+    'You are a real estate market analyst. Provide clear, data-driven market insights that help agents and sellers understand current conditions. Use the actual Rentcast market data provided AND web search to pull current market news/trends. Do not fabricate statistics — cite the data source.';
 
-  const prompt = `Using the property context above (which includes real market data), create a market snapshot.
+  const prompt = `Using the property context above (includes Rentcast market data) plus web search, create a current market snapshot.
 
-The property is in ${state}. Provide insights specific to that state's market conditions.
+The property is in ${state}. Use web search (up to 3 queries) to pull recent ${state} real estate market news, price trend reports, and inventory data from Q1-Q2 2026. Combine with the Rentcast data in the property context.
 
-STRICT OUTPUT CONSTRAINTS:
+CONSTRAINTS:
 - market_summary: 2-3 sentences MAX
 - inventory_level: 1 sentence
 - buyer_vs_seller_market: 1 sentence
 - price_trend_narrative: 2 sentences MAX
 - best_time_to_list: 1-2 sentences
 - key_insights: exactly 5 items, 1 sentence each
-- comparable_recent_sales: MAX 5 comps
+- comparable_recent_sales: MAX 5 comps (use Rentcast comps from property context)
 
-Return JSON with this exact structure:
-{
-  "market_summary": "string (2-3 sentences)",
-  "median_price": 0,
-  "avg_price_per_sqft": 0,
-  "avg_days_on_market": 0,
-  "inventory_level": "string (1 sentence)",
-  "market_trend": "Rising|Stable|Declining",
-  "buyer_vs_seller_market": "string (1 sentence)",
-  "price_trend_narrative": "string (2 sentences)",
-  "best_time_to_list": "string (1-2 sentences)",
-  "key_insights": ["string (exactly 5 items, 1 sentence each)"],
-  "comparable_recent_sales": [
-    {
-      "address": "string",
-      "price": 0,
-      "sqft": 0,
-      "beds": 0,
-      "baths": 0,
-      "sold_date": "string",
-      "dom": 0
-    }
-  ]
-}`;
+After research, call the return_module tool with the structured output.`;
 
-  return (await callClaude(system, ctx, prompt, MODULE_MAX_TOKENS.marketSnapshot, 'marketSnapshot')) as MarketSnapshotModule | null;
+  return (await callClaude({
+    systemPrompt: system,
+    propertyContext: ctx,
+    modulePrompt: prompt,
+    maxTokens: MODULE_MAX_TOKENS.marketSnapshot,
+    moduleName: 'marketSnapshot',
+    outputSchema: marketSnapshotSchema,
+    model: MODEL_SONNET,
+    enableWebSearch: true,
+  })) as MarketSnapshotModule | null;
 }
