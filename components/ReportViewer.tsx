@@ -1643,6 +1643,19 @@ export default function ReportViewer({ report, agentMode = false, stagingCredits
               <Share2 className="h-4 w-4" />
               Share
             </button>
+            {/* Agent-only: Download PDF */}
+            {agentMode && (
+              <a
+                href={`/report/${report.id}/print`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-[#0A0F1E] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                title="Opens a print-ready view. Choose 'Save as PDF' in your browser's print dialog."
+              >
+                <Download className="h-4 w-4" />
+                PDF
+              </a>
+            )}
             {shareToast && (
               <div className="absolute top-full mt-2 right-0 rounded-md bg-slate-900 px-3 py-1.5 text-xs text-white shadow-lg whitespace-nowrap z-10">
                 Link copied!
